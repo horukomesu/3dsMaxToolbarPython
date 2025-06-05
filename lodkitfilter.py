@@ -70,7 +70,7 @@ def restore_original_layers():
     _original_layers.clear()
 
 def build_structure(variants):
-    """Create layer hierarchy 1[variant] -> 2[variant_LODX] and assign nodes."""
+    """Create layer hierarchy variant -> variant_LODX and assign nodes."""
     for obj in rt.objects:
         if not rt.isValidNode(obj):
             continue
@@ -78,8 +78,8 @@ def build_structure(variants):
         if lod is None or variant not in variants:
             continue
         record_original_layer(obj)
-        var_layer = get_or_create_layer(f"1{variant}")
-        lod_layer = get_or_create_layer(f"2{variant}_LOD{lod}")
+        var_layer = get_or_create_layer(variant)
+        lod_layer = get_or_create_layer(f"{variant}_LOD{lod}")
         if hasattr(lod_layer, 'parent'):
             lod_layer.parent = var_layer
         if hasattr(lod_layer, 'addNode'):
@@ -89,11 +89,11 @@ def apply_visibility(button_states, variants):
     lm = rt.LayerManager
     for variant in variants:
         var_btn = button_states.get(f"btnVar_{variant}", True)
-        var_layer = lm.getLayerFromName(f"1{variant}")
+        var_layer = lm.getLayerFromName(variant)
         if var_layer:
             var_layer.on = var_btn
         for i in range(4):
-            lod_layer = lm.getLayerFromName(f"2{variant}_LOD{i}")
+            lod_layer = lm.getLayerFromName(f"{variant}_LOD{i}")
             visible = var_btn and button_states.get(f"btnL{i}", False)
             if lod_layer:
                 lod_layer.on = visible
@@ -120,11 +120,11 @@ def disable_filter():
     restore_original_layers()
     lm = rt.LayerManager
     for variant in list(_current_variants):
-        lyr = lm.getLayerFromName(f"1{variant}")
+        lyr = lm.getLayerFromName(variant)
         if lyr:
             lyr.on = True
         for i in range(4):
-            l2 = lm.getLayerFromName(f"2{variant}_LOD{i}")
+            l2 = lm.getLayerFromName(f"{variant}_LOD{i}")
             if l2:
                 l2.on = True
     _current_variants.clear()
