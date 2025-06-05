@@ -18,7 +18,8 @@ GROUP_TAGS_PATH = lodkitfilter.GROUP_TAGS_PATH
 if hasattr(lodkitfilter, 'collect_scene_variants'):
     collect_scene_variants = lodkitfilter.collect_scene_variants
 else:
-    _FALLBACK_RE = re.compile(r'^(?:lod|l)(\d+)_(\w+)_', re.I)
+    # Variant name stops at the first underscore following the LOD number.
+    _FALLBACK_RE = re.compile(r'^(?:lod|l)(\d+)_([^_]+)_', re.I)
 
     def collect_scene_variants():
         variants = set()

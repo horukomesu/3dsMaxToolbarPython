@@ -8,7 +8,8 @@ GROUP_TAGS_PATH = os.path.join(BASE_DIR, 'nametags.json')
 
 _original_layers = {}
 # Matches names like "LOD3_VARIANT_..." or "l0_test_..." (case-insensitive)
-_LOD_RE = re.compile(r'^(?:lod|l)(\d+)_(\w+)_', re.I)
+# Variant name stops at the first underscore after the LOD index.
+_LOD_RE = re.compile(r'^(?:lod|l)(\d+)_([^_]+)_', re.I)
 
 def load_variants():
     if not os.path.exists(GROUP_TAGS_PATH):
