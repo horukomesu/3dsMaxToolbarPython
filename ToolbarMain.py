@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import re
 
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, BASE_DIR)
@@ -10,11 +11,30 @@ sys.path.insert(0, BASE_DIR)
 import lodkitfilter
 apply_filter_from_button_states = lodkitfilter.apply_filter_from_button_states
 GROUP_TAGS_PATH = lodkitfilter.GROUP_TAGS_PATH
+
+# Provide fallbacks for older lodkitfilter versions that may miss helper
+# utilities. When unavailable, we implement lightweight versions here.
+
+if hasattr(lodkitfilter, 'collect_scene_variants'):
+    collect_scene_variants = lodkitfilter.collect_scene_variants
+else:
+    _FALLBACK_RE = re.compile(r'^(?:lod|l)(\d+)_(\w+)_', re.I)
+
+    def collect_scene_variants():
+        variants = set()
+        for obj in lodkitfilter.rt.objects:
+            if not lodkitfilter.rt.isValidNode(obj):
+                continue
+            m = _FALLBACK_RE.match(getattr(obj, 'name', ''))
+            if m:
+                variants.add(m.group(2).lower())
+        return sorted(variants)
+
 if hasattr(lodkitfilter, 'save_variants'):
     save_variants = lodkitfilter.save_variants
 else:
     def save_variants():
-        tags = lodkitfilter.collect_scene_variants()
+        tags = collect_scene_variants()
         with open(GROUP_TAGS_PATH, 'w') as f:
             json.dump({'groups': tags}, f, indent=4)
         return tags
