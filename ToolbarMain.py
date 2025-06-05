@@ -5,7 +5,7 @@ import json
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, BASE_DIR)
 
-from lodkitfilter import apply_filter_from_button_states, GROUP_TAGS_PATH
+from lodkitfilter import apply_filter_from_button_states, GROUP_TAGS_PATH, save_variants
 
 from PySide2 import QtWidgets
 from PySide2.QtUiTools import QUiLoader
@@ -86,12 +86,14 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         frame = self.findChild(QtWidgets.QFrame, 'OBJframe')
         if frame:
             frame.setEnabled(checked)
-        if not checked:
+        if checked:
+            # Parse current scene object names and update nametags.json
+            save_variants()
+            self.populate_variant_buttons()
+        else:
             self.clear_variant_buttons()
         states = self.collect_states()
         apply_filter_from_button_states(states)
-        if checked:
-            self.populate_variant_buttons()
 
     def on_any_button(self):
         states = self.collect_states()
