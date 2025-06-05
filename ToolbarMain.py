@@ -27,23 +27,45 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         ui_file.close()
         self.setWidget(self.ui)
 
-        chk = self.findChild(QtWidgets.QCheckBox, 'chkEnableFilter')
-        if chk:
-            chk.toggled.connect(self.on_chk_enable_filter)
+        self.variant_button_names = []
+        self.setup_variant_buttons()
+        self.setup_buttons_state_logic()
+        self.setup_lod_buttons_group()
 
-        self.populate_variant_buttons()
-        self.setup_lod_buttons()
-        self.on_chk_enable_filter(chk.isChecked() if chk else False)
+        btn = self.findChild(QtWidgets.QPushButton, "btnL0")
+        if btn:
+            btn.setChecked(True)
+        for name in self.variant_button_names:
+            btn = self.findChild(QtWidgets.QPushButton, name)
+            if btn:
+                btn.setChecked(True)
 
-    def populate_variant_buttons(self):
-        group = self.findChild(QtWidgets.QGroupBox, 'groupBox_3')
+        self.enable_filter_cb = self.findChild(QtWidgets.QCheckBox, "chkEnableFilter")
+        if self.enable_filter_cb:
+            self.enable_filter_cb.toggled.connect(self.on_enable_filter_toggled)
+            try:
+                self.obj_frame = self.findChild(QtWidgets.QFrame, "OBJframe")
+                if self.obj_frame:
+                    self.obj_frame.setEnabled(self.enable_filter_cb.isChecked())
+                else:
+                    print("[WARN] OBJframe not found in UI")
+            except RuntimeError:
+                print("[WARN] OBJframe access caused RuntimeError")
+
+        btn_info = self.findChild(QtWidgets.QPushButton, "btnInfo1")
+        if btn_info:
+            btn_info.clicked.connect(self.show_info_dialog)
+
+    def setup_variant_buttons(self):
+        group = self.findChild(QtWidgets.QGroupBox, "groupBox_3")
+       main
         if not group:
             return
         layout = group.layout()
         while layout.count():
             item = layout.takeAt(0)
             if item.widget():
-                item.widget().deleteLater()
+
 
         tags = []
         try:
@@ -93,6 +115,7 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
             if name.startswith('btnVar_'):
                 states[name] = btn.isChecked()
         return states
+
 
     def closeEvent(self, event):
         global ui_dock_widget
