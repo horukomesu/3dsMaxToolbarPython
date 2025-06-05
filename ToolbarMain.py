@@ -5,7 +5,19 @@ import json
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, BASE_DIR)
 
-from lodkitfilter import apply_filter_from_button_states, GROUP_TAGS_PATH, save_variants
+# Import helper functions from lodkitfilter. Some older copies may miss
+# ``save_variants`` so we provide a fallback implementation.
+import lodkitfilter
+apply_filter_from_button_states = lodkitfilter.apply_filter_from_button_states
+GROUP_TAGS_PATH = lodkitfilter.GROUP_TAGS_PATH
+if hasattr(lodkitfilter, 'save_variants'):
+    save_variants = lodkitfilter.save_variants
+else:
+    def save_variants():
+        tags = lodkitfilter.collect_scene_variants()
+        with open(GROUP_TAGS_PATH, 'w') as f:
+            json.dump({'groups': tags}, f, indent=4)
+        return tags
 
 from PySide2 import QtWidgets
 from PySide2.QtUiTools import QUiLoader
