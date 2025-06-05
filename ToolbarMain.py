@@ -5,7 +5,7 @@ import json
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, BASE_DIR)  # Fix: add path before import
 
-from lodkitfilter import apply_filter_from_button_states
+from lodkitfilter import apply_filter_from_button_states, GROUP_TAGS_PATH
 
 from PySide2 import QtWidgets, QtCore
 from PySide2.QtUiTools import QUiLoader
@@ -66,13 +66,16 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         ui_file.close()
         self.setWidget(self.ui)
 
+        self.variant_button_names = []
+        self.setup_variant_buttons()
         self.setup_buttons_state_logic()
-        self.setup_lod_kit_groups()
-        self.setup_component_buttons()
-        self.sync_lineedits_with_settings()
+        self.setup_lod_buttons_group()
 
-        for btn_name in ["btnL0", "btnKit0", "btnBase"]:
-            btn = self.findChild(QtWidgets.QPushButton, btn_name)
+        btn = self.findChild(QtWidgets.QPushButton, "btnL0")
+        if btn:
+            btn.setChecked(True)
+        for name in self.variant_button_names:
+            btn = self.findChild(QtWidgets.QPushButton, name)
             if btn:
                 btn.setChecked(True)
 
@@ -91,6 +94,33 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         btn_info = self.findChild(QtWidgets.QPushButton, "btnInfo1")
         if btn_info:
             btn_info.clicked.connect(self.show_info_dialog)
+
+    def setup_variant_buttons(self):
+        group = self.findChild(QtWidgets.QGroupBox, "groupBox_3")
+        if not group:
+            return
+        layout = group.layout()
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        try:
+            with open(GROUP_TAGS_PATH, "r") as f:
+                data = json.load(f)
+                tags = data.get("groups", [])
+        except Exception as e:
+            print(f"[WARN] Failed to load tags: {e}")
+            tags = []
+        self.variant_button_names.clear()
+        for idx, tag in enumerate(tags):
+            btn = QtWidgets.QPushButton(tag)
+            btn.setObjectName(f"btnVar_{tag}")
+            btn.setCheckable(True)
+            btn.clicked.connect(self.make_click_handler())
+            row = idx // 4
+            col = idx % 4
+            layout.addWidget(btn, row, col)
+            self.variant_button_names.append(btn.objectName())
 
     def on_enable_filter_toggled(self, checked):
         try:
@@ -112,13 +142,9 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         return states
 
     def get_all_button_names(self):
-        # List all button and checkbox names tracked in UI
-        return [
-            "btnL0", "btnL1", "btnL2", "btnL3",
-            "btnKitEmpty", "btnKit0", "btnKit1", "btnKit2", "btnKit3",
-            "btnBase", "btnInterior", "btnWheel",
-            "chkEnableFilter"
-        ]
+        names = ["btnL0", "btnL1", "btnL2", "btnL3", "chkEnableFilter"]
+        names.extend(self.variant_button_names)
+        return names
 
     def setup_buttons_state_logic(self):
         for btn_name in self.get_all_button_names():
@@ -141,7 +167,7 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
             "Имя для каждого обвеса или базы машины требуется указать вручную..."
         )
 
-    def setup_lod_kit_groups(self):
+    def setup_lod_buttons_group(self):
         self.lod_group = QtWidgets.QButtonGroup(self)
         self.lod_group.setExclusive(True)
         for name in ["btnL0", "btnL1", "btnL2", "btnL3"]:
@@ -150,27 +176,6 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
                 self.lod_group.addButton(btn)
         self.lod_group.buttonClicked.connect(on_apply_filter_clicked)
 
-        self.kit_group = QtWidgets.QButtonGroup(self)
-        self.kit_group.setExclusive(True)
-        for name in ["btnKitEmpty", "btnKit0", "btnKit1", "btnKit2", "btnKit3"]:
-            btn = self.findChild(QtWidgets.QPushButton, name)
-            if btn:
-                self.kit_group.addButton(btn)
-        self.kit_group.buttonClicked.connect(on_apply_filter_clicked)
-
-    def setup_component_buttons(self):
-        for btn_name in ["btnBase", "btnInterior", "btnWheel"]:
-            btn = self.findChild(QtWidgets.QPushButton, btn_name)
-            if btn:
-                btn.setCheckable(True)
-
-    def sync_lineedits_with_settings(self):
-        for key in ["Kit0", "Kit1", "Kit2", "Kit3", "Base", "Interior", "Wheel"]:
-            line_edit = self.findChild(QtWidgets.QLineEdit, f"lnedt{key}")
-            if line_edit:
-                val = get_setting("kits", key, "")
-                line_edit.setText(val)
-                line_edit.textChanged.connect(lambda text, k=key: set_setting("kits", k, text))
 
     def closeEvent(self, event):
         global ui_dock_widget
@@ -202,11 +207,3 @@ def get_button_states():
 if __name__ == '__main__':
     ui_dock_widget = None
     main()
-
-
-
-
-# Diagnostics (optional)
-print(f"BASE_DIR: {BASE_DIR}")
-print(f"sys.path: {sys.path}")
-print(f"lodkitfilter.py exists: {os.path.exists(os.path.join(BASE_DIR, 'lodkitfilter.py'))}")
