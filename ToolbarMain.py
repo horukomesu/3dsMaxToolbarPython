@@ -8,7 +8,8 @@ sys.path.insert(0, BASE_DIR)
 
 from lodkitfilter import (
     apply_filter_from_button_states,
-    save_variants,
+    enable_filter,
+    disable_filter,
     GROUP_TAGS_PATH,
 )
 
@@ -63,7 +64,7 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
             btn = QtWidgets.QPushButton(tag)
             btn.setObjectName(f'btnVar_{tag}')
             btn.setCheckable(True)
-            btn.setChecked(True)
+            btn.setChecked(False)
             btn.clicked.connect(self.on_any_button)
             row = idx // 4
             col = idx % 4
@@ -80,11 +81,14 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
                 item.widget().deleteLater()
 
     def setup_lod_buttons(self):
+        self.lod_group = QtWidgets.QButtonGroup(self)
+        self.lod_group.setExclusive(True)
         for i in range(4):
             btn = self.findChild(QtWidgets.QPushButton, f'btnL{i}')
             if btn:
                 btn.setCheckable(True)
-                btn.setChecked(True)
+                self.lod_group.addButton(btn)
+                btn.setChecked(i == 0)
                 btn.clicked.connect(self.on_any_button)
 
     def on_chk_enable_filter(self, checked):
@@ -92,11 +96,11 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         if frame:
             frame.setEnabled(checked)
         if checked:
-            # Parse current scene object names and update nametags.json
-            save_variants()
+            enable_filter()
             self.populate_variant_buttons()
         else:
             self.clear_variant_buttons()
+            disable_filter()
         states = self.collect_states()
         apply_filter_from_button_states(states)
 
