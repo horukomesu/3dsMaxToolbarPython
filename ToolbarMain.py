@@ -17,10 +17,6 @@ UI_PATH = os.path.join(BASE_DIR, 'majestic_main.ui')
 ui_dock_widget = None
 
 
-def on_apply_filter_clicked():
-    apply_filter_from_button_states(get_button_states())
-
-
 class MajesticDockWidget(QtWidgets.QDockWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -31,8 +27,6 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         ui_file.close()
         self.setWidget(self.ui)
 
-        self.variant_buttons = []
-        self.lod_buttons = []
         chk = self.findChild(QtWidgets.QCheckBox, 'chkEnableFilter')
         if chk:
             chk.toggled.connect(self.on_chk_enable_filter)
@@ -58,7 +52,6 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         except Exception as e:
             print('[LODKit] failed to read nametags.json:', e)
 
-        self.variant_buttons.clear()
         for idx, tag in enumerate(tags):
             btn = QtWidgets.QPushButton(tag)
             btn.setObjectName(f'btnVar_{tag}')
@@ -68,7 +61,6 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
             row = idx // 4
             col = idx % 4
             layout.addWidget(btn, row, col)
-            self.variant_buttons.append(btn)
 
     def setup_lod_buttons(self):
         for i in range(4):
@@ -77,7 +69,6 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
                 btn.setCheckable(True)
                 btn.setChecked(True)
                 btn.clicked.connect(self.on_any_button)
-                self.lod_buttons.append(btn)
 
     def on_chk_enable_filter(self, checked):
         frame = self.findChild(QtWidgets.QFrame, 'OBJframe')
@@ -86,16 +77,21 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         self.on_any_button()
 
     def on_any_button(self):
-        apply_filter_from_button_states(self.get_button_states())
+        states = self.collect_states()
+        apply_filter_from_button_states(states)
 
-    def get_button_states(self):
+    def collect_states(self):
         states = {}
         cb = self.findChild(QtWidgets.QCheckBox, 'chkEnableFilter')
         states['chkEnableFilter'] = cb.isChecked() if cb else False
-        for i, btn in enumerate(self.lod_buttons):
-            states[f'btnL{i}'] = btn.isChecked()
-        for btn in self.variant_buttons:
-            states[btn.objectName()] = btn.isChecked()
+        for i in range(4):
+            btn = self.findChild(QtWidgets.QPushButton, f'btnL{i}')
+            if btn:
+                states[f'btnL{i}'] = btn.isChecked()
+        for btn in self.findChildren(QtWidgets.QPushButton):
+            name = btn.objectName()
+            if name.startswith('btnVar_'):
+                states[name] = btn.isChecked()
         return states
 
     def closeEvent(self, event):
@@ -117,12 +113,6 @@ def main():
     ui_dock_widget = MajesticDockWidget(parent)
     ui_dock_widget.setFloating(True)
     ui_dock_widget.show()
-
-
-def get_button_states():
-    if ui_dock_widget:
-        return ui_dock_widget.get_button_states()
-    return {}
 
 
 if __name__ == '__main__':
