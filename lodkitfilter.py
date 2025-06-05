@@ -1,137 +1,108 @@
-# lodkitfilter.py
-# -*- coding: utf-8 -*-
-"""
-LOD/Kit/Component Layer Organizer for 3ds Max with dynamic group detection and filtering.
-"""
-
-from typing import List
-from pymxs import runtime as rt
 import os
 import json
+import re
+from pymxs import runtime as rt
 
 BASE_DIR = os.path.dirname(__file__)
-SETTINGS_PATH = os.path.join(BASE_DIR, 'settings.json')
 GROUP_TAGS_PATH = os.path.join(BASE_DIR, 'nametags.json')
 
+_original_layers = {}
+_LOD_RE = re.compile(r'^(?:lod|l)(\d+)_(\w+)', re.I)
 
-def get_setting(section, key, default=None):
-    if not os.path.exists(SETTINGS_PATH):
-        return default
-    with open(SETTINGS_PATH, 'r') as f:
+def load_variants():
+    if not os.path.exists(GROUP_TAGS_PATH):
+        return []
+    with open(GROUP_TAGS_PATH, 'r') as f:
         data = json.load(f)
-    return data.get(section, {}).get(key, default)
+    return [v.lower() for v in data.get('groups', [])]
 
-
-
-def save_unique_component_tags():
-    unique_tags = set()
+def collect_scene_variants():
+    variants = set()
     for obj in rt.objects:
         if not rt.isValidNode(obj):
             continue
-        
-        parts = obj.name.lower().split('_')
-        if len(parts) >= 2:
-            unique_tags.add(parts[1])
+        _, variant = parse_name(obj.name)
+        if variant:
+            variants.add(variant)
+    return sorted(variants)
 
-    base = get_setting("kits", "Base", "base")
-    wheel = get_setting("kits", "Wheel", "wheel")
-    interior = get_setting("kits", "Interior", "interior")
-
-    tags = [base, wheel, interior] + sorted(unique_tags - {base, wheel, interior})
-
+def save_variants():
+    tags = collect_scene_variants()
     with open(GROUP_TAGS_PATH, 'w') as f:
-        json.dump({"groups": tags}, f, indent=4)
+        json.dump({'groups': tags}, f, indent=4)
+    return tags
 
-    print("Saved group tags to nametags.json:", tags)
+def parse_name(name):
+    if not isinstance(name, str):
+        return None, None
+    m = _LOD_RE.match(name)
+    if not m:
+        return None, None
+    return int(m.group(1)), m.group(2).lower()
 
+def get_or_create_layer(name):
+    lm = rt.LayerManager
+    lyr = lm.getLayerFromName(name)
+    if lyr:
+        return lyr
+    return lm.newLayerFromName(name)
 
-def load_component_tags():
-    save_unique_component_tags()
-    with open(GROUP_TAGS_PATH, 'r') as f:
-        data = json.load(f)
-    return data.get("groups", [])
+def record_original_layer(obj):
+    if obj.handle not in _original_layers:
+        try:
+            _original_layers[obj.handle] = obj.layer.name
+        except Exception:
+            pass
 
+def restore_original_layers():
+    lm = rt.LayerManager
+    for handle, layer_name in list(_original_layers.items()):
+        node = rt.maxOps.getNodeByHandle(handle)
+        if node and rt.isValidNode(node):
+            lyr = lm.getLayerFromName(layer_name)
+            if lyr:
+                lyr.addNode(node)
+    _original_layers.clear()
 
-class NameParser:
-    def __init__(self, raw_name: str):
-        self.raw_name = raw_name
-        self.parts = self._split_parts(raw_name)
+def build_structure(variants):
+    for obj in rt.objects:
+        if not rt.isValidNode(obj):
+            continue
+        lod, variant = parse_name(obj.name)
+        if lod is None or variant not in variants:
+            continue
+        record_original_layer(obj)
+        var_layer = get_or_create_layer(variant)
+        lod_layer = get_or_create_layer(f"{variant}_LOD{lod}")
+        if hasattr(lod_layer, 'parent'):
+            lod_layer.parent = var_layer
+        if hasattr(lod_layer, 'addNode'):
+            lod_layer.addNode(obj)
 
-    def _split_parts(self, name: str) -> List[str]:
-        if not isinstance(name, str):
-            return []
-        return [part.strip().lower() for part in name.split('_') if part.strip()]
+def apply_visibility(button_states, variants):
+    lm = rt.LayerManager
+    for variant in variants:
+        var_btn = button_states.get(f"btnVar_{variant}", True)
+        var_layer = lm.getLayerFromName(variant)
+        if var_layer:
+            var_layer.on = var_btn
+        for i in range(4):
+            lod_layer = lm.getLayerFromName(f"{variant}_LOD{i}")
+            visible = var_btn and button_states.get(f"btnL{i}", False)
+            if lod_layer:
+                lod_layer.on = visible
 
-    def get_component_tag(self) -> str:
-        return self.parts[1] if len(self.parts) >= 2 else ""
-
-
-class LayerBuilder:
-    def __init__(self, enabled_indices: List[int]):
-        self.enabled_indices = enabled_indices
-        self.layer_manager = rt.LayerManager
-        self.tags = load_component_tags()
-
-    def get_or_create_layer(self, name: str):
-        existing = self.layer_manager.getLayerFromName(name)
-        if existing:
-            return existing
-        return self.layer_manager.newLayerFromName(name)
-
-    def assign_object_to_layer(self, obj, layer):
-        if rt.isProperty(layer, 'addNode'):
-            layer.addNode(obj)
-
-    def build_layers(self):
-        for obj in rt.objects:
-            if not rt.isValidNode(obj):
-                continue
-
-            parser = NameParser(obj.name)
-            comp_tag = parser.get_component_tag()
-            if comp_tag not in self.tags:
-                continue
-
-            tag_index = self.tags.index(comp_tag)
-            if tag_index not in self.enabled_indices:
-                continue
-
-            print(f"Placing {obj.name} into layer: {comp_tag}")
-            layer = self.get_or_create_layer(comp_tag)
-            self.assign_object_to_layer(obj, layer)
-
-
-class SceneLayerOrganizer:
-    def __init__(self, enabled_indices: List[int]):
-        self.layer_builder = LayerBuilder(enabled_indices)
-
-    def apply(self):
-        self.layer_builder.build_layers()
+def apply_filter_from_button_states(button_states):
+    if not button_states.get('chkEnableFilter', False):
+        variants = load_variants()
+        restore_original_layers()
+        tmp = {f'btnVar_{v}': True for v in variants}
+        tmp.update({f'btnL{i}': True for i in range(4)})
+        apply_visibility(tmp, variants)
         rt.redrawViews()
-
-
-def apply_filter_from_button_states(button_states: dict):
-    if not button_states.get("chkEnableFilter", False):
-        print("Filter not enabled, skipping.")
         return
 
-    tags = load_component_tags()
-    print("Loaded tags:", tags )
-    enabled_indices = []
-
-    if button_states.get("btnBase", False):
-        enabled_indices.append(0)
-    if button_states.get("btnWheel", False):
-        enabled_indices.append(1)
-    if button_states.get("btnInterior", False):
-        enabled_indices.append(2)
-
-    for i in range(4):
-        if button_states.get(f"btnKit{i}", False):
-            index = i + 3
-            if index < len(tags):
-                enabled_indices.append(index)
-
-    print("Enabled indices:", enabled_indices)
-    organizer = SceneLayerOrganizer(enabled_indices)
-    organizer.apply()
+    variants = save_variants()
+    build_structure(variants)
+    apply_visibility(button_states, variants)
+    rt.redrawViews()
