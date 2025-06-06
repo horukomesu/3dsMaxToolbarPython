@@ -1,25 +1,5 @@
-2025-06-06 14:41:21,923 [INFO] Checking for updates...
-2025-06-06 14:41:22,453 [ERROR] Failed to fetch remote version: 404 Client Error: Not Found for url: https://api.github.com/repos/owner/repo/commits/main
-2025-06-06 14:41:22,454 [INFO] Local version: 9c06cbb56bccb392091f6caf9e92c7e685219c13
-2025-06-06 14:41:22,454 [INFO] Remote version: None
-2025-06-06 14:41:22,454 [INFO] No remote version
-2025-06-06 14:41:39,172 [INFO] Checking for updates...
-2025-06-06 14:41:39,457 [ERROR] Failed to fetch remote version: 404 Client Error: Not Found for url: https://api.github.com/repos/owner/repo/commits/main
-2025-06-06 14:41:39,457 [INFO] Local version: 9c06cbb56bccb392091f6caf9e92c7e685219c13
-2025-06-06 14:41:39,458 [INFO] Remote version: None
-2025-06-06 14:41:39,458 [INFO] No remote version
-2025-06-06 14:41:51,085 [INFO] Checking for updates...
-2025-06-06 14:41:51,377 [ERROR] Failed to fetch remote version: 404 Client Error: Not Found for url: https://api.github.com/repos/owner/repo/commits/main
-2025-06-06 14:41:51,377 [INFO] Local version: 9c06cbb56bccb392091f6caf9e92c7e685219c13
-2025-06-06 14:41:51,377 [INFO] Remote version: None
-2025-06-06 14:41:51,377 [INFO] No remote version
-2025-06-06 14:42:00,574 [INFO] Checking for updates...
-2025-06-06 14:42:00,875 [ERROR] Failed to fetch remote version: 404 Client Error: Not Found for url: https://api.github.com/repos/owner/repo/commits/main
-2025-06-06 14:42:00,875 [INFO] Local version: 9c06cbb56bccb392091f6caf9e92c7e685219c13
-2025-06-06 14:42:00,875 [INFO] Remote version: None
-2025-06-06 14:42:00,875 [INFO] No remote version
-2025-06-06 14:45:39,678 [INFO] Checking for updates...
-2025-06-06 14:45:40,098 [ERROR] Failed to fetch remote version: 404 Client Error: Not Found for url: https://api.github.com/repos/owner/repo/commits/main
-2025-06-06 14:45:40,098 [INFO] Local version: 9c06cbb56bccb392091f6caf9e92c7e685219c13
-2025-06-06 14:45:40,098 [INFO] Remote version: None
-2025-06-06 14:45:40,098 [INFO] No remote version
+2025-06-06 16:56:33,375 [INFO] Downloading repository archive...
+2025-06-06 16:56:43,423 [INFO] Downloading repository archive...
+2025-06-06 17:23:49,729 [INFO] Checking key files...
+2025-06-06 17:23:50,376 [ERROR] Failed to fetch filelist.txt: 404 Client Error: Not Found for url: https://raw.githubusercontent.com/horukomesu/3dsMaxToolbarPython/main/filelist.txt
+2025-06-06 17:23:50,381 [ERROR] No key file list fetched!
