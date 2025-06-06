@@ -687,6 +687,19 @@
        <layout class="QGridLayout" name="gridLayout"/>
       </widget>
      </widget>
+     <widget class="QPushButton" name="btnMakeLayers">
+      <property name="geometry">
+       <rect>
+        <x>170</x>
+        <y>0</y>
+        <width>80</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Сделать Слои</string>
+      </property>
+     </widget>
     </widget>
     <widget class="QWidget" name="GeoTab">
      <attribute name="title">
