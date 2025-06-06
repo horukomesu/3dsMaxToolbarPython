@@ -13,6 +13,8 @@ import shutil
 import zipfile
 from io import BytesIO
 from typing import Callable, Optional
+import sys
+import subprocess
 
 from PySide2 import QtWidgets, QtCore
 
@@ -24,6 +26,8 @@ GITHUB_REPO = "3dsMaxToolbarPython"
 BRANCH = "main"
 VERSION_FILE = "VERSION"
 LOG_FILE = "update.log"
+# Environment variable used to skip update when already run by launcher
+SKIP_ENV_VAR = "AUTOUPDATER_SKIP"
 # ---------------------------------------------------------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -183,6 +187,12 @@ def _perform_update(zip_data: bytes, new_version: str, callback: Optional[Progre
 def update_logic(confirm: Callable[[str], bool],
                  callback: Optional[ProgressCallback] = None) -> bool:
     """Core workflow used by both UI and CLI wrappers."""
+    if os.environ.get(SKIP_ENV_VAR):
+        _logger.info("Skipping update due to %s", SKIP_ENV_VAR)
+        restore_key_files(confirm, callback)
+        if callback:
+            callback("Up to date", 100)
+        return False
     if callback:
         callback("Checking for updates...", 0)
     _logger.info("Checking for updates...")
@@ -386,4 +396,31 @@ def check_key_files_and_recover(parent=None, callback: Optional[ProgressCallback
     return restore_key_files(confirm, callback)
 
 # ========================================================================
+
+
+def launch_main_script(script: str = "ToolbarMain.py") -> None:
+    """Run the specified main script using the current Python interpreter."""
+    path = script
+    if not os.path.isabs(path):
+        path = os.path.join(BASE_DIR, path)
+    if not os.path.exists(path):
+        print(f"Main script '{path}' not found")
+        return
+    os.environ[SKIP_ENV_VAR] = "1"
+    os.execv(sys.executable, [sys.executable, path])
+
+
+def main() -> None:
+    """Command line entry point for the updater."""
+    print("Checking for updates...")
+    try:
+        update_logic(lambda _msg: True, lambda m, v: print(f"{m} ({v}%)"))
+    except Exception as exc:  # pragma: no cover - just in case
+        print(f"Update failed: {exc}")
+        return
+    launch_main_script()
+
+
+if __name__ == "__main__":
+    main()
 
