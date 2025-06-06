@@ -1,6 +1,7 @@
 {
     "groups": [
         "base",
+        "body",
         "restyle",
         "restyleunified",
         "rim",

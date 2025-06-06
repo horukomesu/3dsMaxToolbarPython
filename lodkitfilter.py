@@ -55,7 +55,6 @@ def load_variants():
         data = json.load(f)
     return [v.lower() for v in data.get('groups', [])]
 
-@profile_time
 def collect_scene_variants():
     variants = set()
     for obj in list(rt.objects):
@@ -66,7 +65,6 @@ def collect_scene_variants():
             variants.add(variant)
     return sorted(variants)
 
-@profile_time
 def save_variants():
     tags = collect_scene_variants()
     with open(GROUP_TAGS_PATH, 'w') as f:
@@ -112,7 +110,6 @@ def record_original_layer(obj):
         except Exception:
             pass
 
-@profile_time
 def restore_original_layers():
     lm = rt.LayerManager
     _layer_nodes.clear()
@@ -174,7 +171,6 @@ def _sync_layer_objects_visibility(layer):
     handles = _collect_layer_handles(layer)
     _bulk_set_hidden(handles, not visible)
 
-@profile_time
 def build_structure(variants, assign_wrong=True):
     """Create LOD layers and assign objects in bulk."""
     lm = rt.LayerManager
@@ -232,7 +228,6 @@ def build_structure(variants, assign_wrong=True):
 
 
 
-@profile_time
 def apply_visibility(button_states, variants):
     global _last_button_states
     if button_states == _last_button_states:
@@ -273,7 +268,6 @@ def apply_visibility(button_states, variants):
         _bulk_set_hidden(handles_to_show, False)
     return changed
 
-@profile_time
 def apply_filter_from_button_states(button_states):
     """Update layer visibility according to UI states."""
     if not button_states.get('chkEnableFilter', False):
@@ -284,7 +278,6 @@ def apply_filter_from_button_states(button_states):
         rt.redrawViews()
 
 
-@profile_time
 def enable_filter():
     """Parse variants, create layers and record assignments."""
     global _current_variants, _track_created
@@ -300,7 +293,6 @@ def enable_filter():
     rt.redrawViews()
 
 
-@profile_time
 def disable_filter():
     """Restore nodes to their original layers and reset layer visibility."""
     global _track_created
@@ -335,7 +327,6 @@ def disable_filter():
     rt.redrawViews()
 
 
-@profile_time
 def make_layers():
     """Create LOD layers without enabling the filter."""
     global _track_created

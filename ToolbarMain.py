@@ -21,6 +21,7 @@ from PySide2 import QtWidgets
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtCore import QFile
 import qtmax
+import autoupdater
 
 UI_PATH = os.path.join(BASE_DIR, 'majestic_main.ui')
 
@@ -156,4 +157,26 @@ def main():
 
 if __name__ == '__main__':
     ui_dock_widget = None
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    progress = QtWidgets.QProgressDialog(
+        "Checking for updates...", None, 0, 100, qtmax.GetQMaxMainWindow()
+    )
+    progress.setWindowTitle("Updating")
+    progress.setCancelButton(None)
+    progress.setAutoClose(False)
+    progress.show()
+
+    def on_progress(msg: str, value: int) -> None:
+        progress.setLabelText(msg)
+        progress.setValue(value)
+        app.processEvents()
+
+    updated = autoupdater.check_for_updates(on_progress)
+    progress.close()
+
+    if updated:
+        os.execl(sys.executable, sys.executable, __file__)
+
     main()
