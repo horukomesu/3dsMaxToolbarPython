@@ -1,10 +1,13 @@
 import os
 import sys
 import json
-
+import importlib
 
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, BASE_DIR)
+
+import lodkitfilter
+importlib.reload(lodkitfilter)
 
 from lodkitfilter import (
     apply_filter_from_button_states,

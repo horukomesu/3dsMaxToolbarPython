@@ -98,43 +98,58 @@ def _sync_layer_objects_visibility(layer):
 
 def build_structure(variants, assign_wrong=True):
     """
-    Для каждого варианта создаёт родительский слой (variant).
-    Для каждого variant_LODX создаёт слой и назначает ему parent через setParent().
-    Объекты сцены назначаются в слой variant_LODX.
+    Оптимизированная версия build_structure.
     """
     lm = rt.LayerManager
     parent_layers = {}
-    # Создаём родительские слои
+    lod_layers = {}
+    nodes_by_layer = {}  # Слой -> [объекты]
+    wrong_nodes = []
+
+    # Создаём родительские слои один раз
     for variant in variants:
         parent_layers[variant] = get_or_create_layer(variant)
-        _sync_layer_objects_visibility(parent_layers[variant])
     wrong_layer = get_or_create_layer("WrongNames") if assign_wrong else None
-    if wrong_layer:
-        _sync_layer_objects_visibility(wrong_layer)
-    # Собираем все объекты и создаём LOD-слои
+
+    # Сначала группируем объекты по слоям в памяти
     for obj in rt.objects:
         if not rt.isValidNode(obj):
             continue
         lod, variant = parse_name(obj.name)
         if lod is None or variant not in variants:
-            if assign_wrong and wrong_layer and hasattr(wrong_layer, 'addNode'):
+            if assign_wrong and wrong_layer:
                 record_original_layer(obj)
-                wrong_layer.addNode(obj)
-                _sync_layer_objects_visibility(wrong_layer)
+                wrong_nodes.append(obj)
             continue
         record_original_layer(obj)
-        var_layer = parent_layers[variant]
         lod_layer_name = f"{variant}_LOD{lod}"
-        lod_layer = get_or_create_layer(lod_layer_name)
-        # Устанавливаем родителя через setParent
-        if hasattr(lod_layer, 'setParent'):
-            lod_layer.setParent(var_layer)
-        # Назначаем объект в слой
-        if hasattr(lod_layer, 'addNode'):
-            lod_layer.addNode(obj)
-        _sync_layer_objects_visibility(lod_layer)
-    # Обновляем отображение
+        if lod_layer_name not in lod_layers:
+            lod_layers[lod_layer_name] = get_or_create_layer(lod_layer_name)
+            # Устанавливаем родителя только один раз
+            if hasattr(lod_layers[lod_layer_name], 'setParent'):
+                lod_layers[lod_layer_name].setParent(parent_layers[variant])
+        nodes_by_layer.setdefault(lod_layer_name, []).append(obj)
+
+    # Только теперь назначаем объекты слоям одним bulk-ом
+    for layer_name, nodes in nodes_by_layer.items():
+        lyr = lod_layers[layer_name]
+        if hasattr(lyr, 'addNode'):
+            for obj in nodes:
+                lyr.addNode(obj)
+
+    if assign_wrong and wrong_layer:
+        for obj in wrong_nodes:
+            wrong_layer.addNode(obj)
+
+    # Видимость синхронизируем только по одному разу
+    for layer in parent_layers.values():
+        _sync_layer_objects_visibility(layer)
+    for layer in lod_layers.values():
+        _sync_layer_objects_visibility(layer)
+    if wrong_layer:
+        _sync_layer_objects_visibility(wrong_layer)
     rt.redrawViews()
+
 
 
 
