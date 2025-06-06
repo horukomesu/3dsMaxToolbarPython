@@ -21,8 +21,8 @@ import requests
 
 # Configurable parameters ----------------------------------------------------
 # GitHub owner and repository name, e.g. "myuser" and "myrepo"
-GITHUB_OWNER = "owner"
-GITHUB_REPO = "repo"
+GITHUB_OWNER = "horukomesu"
+GITHUB_REPO = "3dsMaxToolbarPython"
 # Branch name to fetch
 BRANCH = "main"
 # Name of the file that stores the commit hash/version
