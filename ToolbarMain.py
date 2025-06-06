@@ -143,7 +143,15 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
 
 
 def main():
+    """Launch the toolbar and run the auto-updater."""
+
     global ui_dock_widget
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    updated = autoupdater.update_with_ui(qtmax.GetQMaxMainWindow())
+    if updated:
+        os.execl(sys.executable, sys.executable, __file__)
 
     if ui_dock_widget:
         try:
@@ -159,11 +167,4 @@ def main():
 
 if __name__ == '__main__':
     ui_dock_widget = None
-
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-
-    updated = autoupdater.update_with_ui(qtmax.GetQMaxMainWindow())
-    if updated:
-        os.execl(sys.executable, sys.executable, __file__)
-
     main()
