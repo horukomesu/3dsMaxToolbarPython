@@ -6,8 +6,13 @@ from pymxs import runtime as rt
 BASE_DIR = os.path.dirname(__file__)
 GROUP_TAGS_PATH = os.path.join(BASE_DIR, 'nametags.json')
 
+# Keeps original layer assignments so they can be restored when disabling the filter
 _original_layers = {}
-_LOD_RE = re.compile(r'^(?:lod|l)(\d+)_(\w+)', re.I)
+# Current list of variants parsed when the filter was enabled
+_current_variants = []
+# Matches names like "LOD3_VARIANT_..." or "l0_test_..." (case-insensitive)
+# Variant name stops at the first underscore after the LOD index.
+_LOD_RE = re.compile(r'^(?:lod|l)(\d+)_([^_]+)_', re.I)
 
 def load_variants():
     if not os.path.exists(GROUP_TAGS_PATH):
@@ -64,7 +69,20 @@ def restore_original_layers():
                 lyr.addNode(node)
     _original_layers.clear()
 
+from pymxs import runtime as rt
+
 def build_structure(variants):
+    """
+    Для каждого варианта создаёт родительский слой (variant).
+    Для каждого variant_LODX создаёт слой и назначает ему parent через setParent().
+    Объекты сцены назначаются в слой variant_LODX.
+    """
+    lm = rt.LayerManager
+    parent_layers = {}
+    # Создаём родительские слои
+    for variant in variants:
+        parent_layers[variant] = get_or_create_layer(variant)
+    # Собираем все объекты и создаём LOD-слои
     for obj in rt.objects:
         if not rt.isValidNode(obj):
             continue
@@ -72,12 +90,19 @@ def build_structure(variants):
         if lod is None or variant not in variants:
             continue
         record_original_layer(obj)
-        var_layer = get_or_create_layer(variant)
-        lod_layer = get_or_create_layer(f"{variant}_LOD{lod}")
-        if hasattr(lod_layer, 'parent'):
-            lod_layer.parent = var_layer
+        var_layer = parent_layers[variant]
+        lod_layer_name = f"{variant}_LOD{lod}"
+        lod_layer = get_or_create_layer(lod_layer_name)
+        # Устанавливаем родителя через setParent
+        if hasattr(lod_layer, 'setParent'):
+            lod_layer.setParent(var_layer)
+        # Назначаем объект в слой
         if hasattr(lod_layer, 'addNode'):
             lod_layer.addNode(obj)
+    # Обновляем отображение
+    rt.redrawViews()
+
+
 
 def apply_visibility(button_states, variants):
     lm = rt.LayerManager
@@ -93,16 +118,34 @@ def apply_visibility(button_states, variants):
                 lod_layer.on = visible
 
 def apply_filter_from_button_states(button_states):
+    """Update layer visibility according to UI states."""
     if not button_states.get('chkEnableFilter', False):
-        variants = load_variants()
-        restore_original_layers()
-        tmp = {f'btnVar_{v}': True for v in variants}
-        tmp.update({f'btnL{i}': True for i in range(4)})
-        apply_visibility(tmp, variants)
         rt.redrawViews()
         return
 
-    variants = save_variants()
-    build_structure(variants)
-    apply_visibility(button_states, variants)
+    apply_visibility(button_states, _current_variants)
+    rt.redrawViews()
+
+
+def enable_filter():
+    """Parse variants, create layers and record assignments."""
+    global _current_variants
+    _current_variants = save_variants()
+    build_structure(_current_variants)
+    rt.redrawViews()
+
+
+def disable_filter():
+    """Restore nodes to their original layers and show all custom layers."""
+    restore_original_layers()
+    lm = rt.LayerManager
+    for variant in list(_current_variants):
+        lyr = lm.getLayerFromName(variant)
+        if lyr:
+            lyr.on = True
+        for i in range(4):
+            l2 = lm.getLayerFromName(f"{variant}_LOD{i}")
+            if l2:
+                l2.on = True
+    _current_variants.clear()
     rt.redrawViews()

@@ -2,10 +2,16 @@ import os
 import sys
 import json
 
+
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, BASE_DIR)
 
-from lodkitfilter import apply_filter_from_button_states, GROUP_TAGS_PATH
+from lodkitfilter import (
+    apply_filter_from_button_states,
+    enable_filter,
+    disable_filter,
+    GROUP_TAGS_PATH,
+)
 
 from PySide2 import QtWidgets
 from PySide2.QtUiTools import QUiLoader
@@ -58,10 +64,10 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
             btn = QtWidgets.QPushButton(tag)
             btn.setObjectName(f'btnVar_{tag}')
             btn.setCheckable(True)
-            btn.setChecked(True)
+            btn.setChecked(False)
             btn.clicked.connect(self.on_any_button)
-            row = idx // 4
-            col = idx % 4
+            row = idx // 2
+            col = idx % 2
             layout.addWidget(btn, row, col)
 
     def clear_variant_buttons(self):
@@ -75,23 +81,28 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
                 item.widget().deleteLater()
 
     def setup_lod_buttons(self):
+        self.lod_group = QtWidgets.QButtonGroup(self)
+        self.lod_group.setExclusive(True)
         for i in range(4):
             btn = self.findChild(QtWidgets.QPushButton, f'btnL{i}')
             if btn:
                 btn.setCheckable(True)
-                btn.setChecked(True)
+                self.lod_group.addButton(btn)
+                btn.setChecked(i == 0)
                 btn.clicked.connect(self.on_any_button)
 
     def on_chk_enable_filter(self, checked):
         frame = self.findChild(QtWidgets.QFrame, 'OBJframe')
         if frame:
             frame.setEnabled(checked)
-        if not checked:
+        if checked:
+            enable_filter()
+            self.populate_variant_buttons()
+        else:
             self.clear_variant_buttons()
+            disable_filter()
         states = self.collect_states()
         apply_filter_from_button_states(states)
-        if checked:
-            self.populate_variant_buttons()
 
     def on_any_button(self):
         states = self.collect_states()
