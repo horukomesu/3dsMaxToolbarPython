@@ -14,6 +14,10 @@ _current_variants = []
 # Variant name stops at the first underscore after the LOD index.
 _LOD_RE = re.compile(r'^(?:lod|l)(\d+)_([^_]+)_', re.I)
 
+# Track layers created while building structure
+_created_layers = set()
+_track_created = False
+
 def load_variants():
     if not os.path.exists(GROUP_TAGS_PATH):
         return []
@@ -50,7 +54,10 @@ def get_or_create_layer(name):
     lyr = lm.getLayerFromName(name)
     if lyr:
         return lyr
-    return lm.newLayerFromName(name)
+    lyr = lm.newLayerFromName(name)
+    if _track_created:
+        _created_layers.add(name)
+    return lyr
 
 def record_original_layer(obj):
     if obj.handle not in _original_layers:
@@ -71,7 +78,7 @@ def restore_original_layers():
 
 from pymxs import runtime as rt
 
-def build_structure(variants):
+def build_structure(variants, assign_wrong=True):
     """
     Для каждого варианта создаёт родительский слой (variant).
     Для каждого variant_LODX создаёт слой и назначает ему parent через setParent().
@@ -82,12 +89,16 @@ def build_structure(variants):
     # Создаём родительские слои
     for variant in variants:
         parent_layers[variant] = get_or_create_layer(variant)
+    wrong_layer = get_or_create_layer("WrongNames") if assign_wrong else None
     # Собираем все объекты и создаём LOD-слои
     for obj in rt.objects:
         if not rt.isValidNode(obj):
             continue
         lod, variant = parse_name(obj.name)
         if lod is None or variant not in variants:
+            if assign_wrong and wrong_layer and hasattr(wrong_layer, 'addNode'):
+                record_original_layer(obj)
+                wrong_layer.addNode(obj)
             continue
         record_original_layer(obj)
         var_layer = parent_layers[variant]
@@ -129,23 +140,51 @@ def apply_filter_from_button_states(button_states):
 
 def enable_filter():
     """Parse variants, create layers and record assignments."""
-    global _current_variants
+    global _current_variants, _track_created
     _current_variants = save_variants()
-    build_structure(_current_variants)
+    with rt.undo(True, "Enable LOD Filter"):
+        _track_created = True
+        build_structure(_current_variants, assign_wrong=True)
+        _track_created = False
     rt.redrawViews()
 
 
 def disable_filter():
-    """Restore nodes to their original layers and show all custom layers."""
-    restore_original_layers()
-    lm = rt.LayerManager
-    for variant in list(_current_variants):
-        lyr = lm.getLayerFromName(variant)
-        if lyr:
-            lyr.on = True
-        for i in range(4):
-            l2 = lm.getLayerFromName(f"{variant}_LOD{i}")
-            if l2:
-                l2.on = True
-    _current_variants.clear()
+    """Restore nodes to their original layers and remove created layers."""
+    global _track_created
+    with rt.undo(True, "Disable LOD Filter"):
+        restore_original_layers()
+        lm = rt.LayerManager
+        for name in list(_created_layers):
+            try:
+                lm.deleteLayerByName(name)
+            except Exception:
+                lyr = lm.getLayerFromName(name)
+                if lyr:
+                    try:
+                        lm.deleteLayer(lyr)
+                    except Exception:
+                        pass
+        _created_layers.clear()
+        for variant in list(_current_variants):
+            for i in range(4):
+                lyr = lm.getLayerFromName(f"{variant}_LOD{i}")
+                if lyr:
+                    lyr.on = True
+            pl = lm.getLayerFromName(variant)
+            if pl:
+                pl.on = True
+        _current_variants.clear()
+        _track_created = False
+    rt.redrawViews()
+
+
+def make_layers():
+    """Create LOD layers without enabling the filter."""
+    global _track_created
+    variants = save_variants()
+    with rt.undo(True, "Create LOD Layers"):
+        _track_created = True
+        build_structure(variants, assign_wrong=True)
+        _track_created = False
     rt.redrawViews()

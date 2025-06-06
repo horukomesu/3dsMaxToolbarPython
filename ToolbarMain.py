@@ -10,6 +10,7 @@ from lodkitfilter import (
     apply_filter_from_button_states,
     enable_filter,
     disable_filter,
+    make_layers,
     GROUP_TAGS_PATH,
 )
 
@@ -42,6 +43,10 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
                 frame.setEnabled(False)
 
         self.setup_lod_buttons()
+
+        btn_layers = self.findChild(QtWidgets.QPushButton, 'btnMakeLayers')
+        if btn_layers:
+            btn_layers.clicked.connect(self.on_make_layers)
 
     def populate_variant_buttons(self):
         group = self.findChild(QtWidgets.QGroupBox, 'groupBox_3')
@@ -107,6 +112,9 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
     def on_any_button(self):
         states = self.collect_states()
         apply_filter_from_button_states(states)
+
+    def on_make_layers(self):
+        make_layers()
 
     def collect_states(self):
         states = {}
