@@ -2,3 +2,5 @@ lodkitfilter.py
 majestic_main.ui
 ToolbarMain.py
 nametags.json
+VERSION
+
