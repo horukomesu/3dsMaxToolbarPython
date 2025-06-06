@@ -140,6 +140,25 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         event.accept()
 
 
+class UpdateDialog(QtWidgets.QDialog):
+    """Simple dialog displaying update progress."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Updating")
+        layout = QtWidgets.QVBoxLayout(self)
+        self.label = QtWidgets.QLabel("", self)
+        self.progress = QtWidgets.QProgressBar(self)
+        self.progress.setRange(0, 100)
+        layout.addWidget(self.label)
+        layout.addWidget(self.progress)
+
+    def update_status(self, msg: str, value: int) -> None:
+        self.label.setText(msg)
+        self.progress.setValue(value)
+        QtWidgets.QApplication.processEvents()
+
+
 def main():
     global ui_dock_widget
 
@@ -160,23 +179,28 @@ if __name__ == '__main__':
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
-    progress = QtWidgets.QProgressDialog(
-        "Checking for updates...", None, 0, 100, qtmax.GetQMaxMainWindow()
-    )
-    progress.setWindowTitle("Updating")
-    progress.setCancelButton(None)
-    progress.setAutoClose(False)
-    progress.show()
+    local_version = autoupdater._read_local_version()
+    remote_version = autoupdater._fetch_remote_version()
 
-    def on_progress(msg: str, value: int) -> None:
-        progress.setLabelText(msg)
-        progress.setValue(value)
-        app.processEvents()
+    needs_update = remote_version is not None and local_version != remote_version
 
-    updated = autoupdater.check_for_updates(on_progress)
-    progress.close()
+    if needs_update:
+        reply = QtWidgets.QMessageBox.question(
+            qtmax.GetQMaxMainWindow(),
+            "Update Available",
+            "\u041e\u0431\u043d\u0430\u0440\u0443\u0436\u0435\u043d\u043e \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435, \u0441\u043a\u0430\u0447\u0430\u0442\u044c?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+        )
+        if reply == QtWidgets.QMessageBox.Yes:
+            dlg = UpdateDialog(qtmax.GetQMaxMainWindow())
+            dlg.show()
 
-    if updated:
-        os.execl(sys.executable, sys.executable, __file__)
+            def on_progress(msg: str, value: int) -> None:
+                dlg.update_status(msg, value)
+
+            updated = autoupdater.check_for_updates(on_progress)
+            dlg.close()
+            if updated:
+                os.execl(sys.executable, sys.executable, __file__)
 
     main()
