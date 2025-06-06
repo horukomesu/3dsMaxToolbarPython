@@ -17,13 +17,15 @@ import autoupdater
 autoupdater.check_for_updates()
 ```
 
-During an update the existing files are backed up in the `backup` folder next
-to the scripts and the current commit hash is stored in the file `VERSION`.
-All actions are logged to `update.log`.
+During an update all files and folders in the project directory are replaced
+with the contents of the repository except for the updater itself and the
+log file. Missing files are restored automatically on each start. The current
+commit hash is stored in the file `VERSION` and all actions are logged to
+`update.log`.
 
 `ToolbarMain.py` performs this check automatically on startup and shows a
 progress dialog when downloading an update. If an update is installed the
 script is restarted.
 
-Edit the constants `GITHUB_OWNER` and `GITHUB_REPO` inside `autoupdater.py`
-to point to the desired repository.
+Edit the constants `GITHUB_OWNER`, `GITHUB_REPO`, `BRANCH` and `VERSION_FILE`
+inside `autoupdater.py` to point to the desired repository and version file.
