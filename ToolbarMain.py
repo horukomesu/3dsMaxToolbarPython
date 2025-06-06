@@ -21,8 +21,6 @@ from PySide2 import QtWidgets
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtCore import QFile
 import qtmax
-import autoupdater
-importlib.reload(autoupdater)
 
 
 UI_PATH = os.path.join(BASE_DIR, 'majestic_main.ui')

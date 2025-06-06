@@ -7,6 +7,9 @@ All operations are logged to ``update.log``.
 
 from __future__ import annotations
 
+BASE_DIR = os.path.dirname(__file__)
+sys.path.insert(0, BASE_DIR)
+
 import logging
 import os
 import shutil
@@ -14,7 +17,6 @@ import zipfile
 from io import BytesIO
 from typing import Callable, Optional
 import sys
-import subprocess
 
 from PySide2 import QtWidgets, QtCore
 
@@ -398,16 +400,6 @@ def check_key_files_and_recover(parent=None, callback: Optional[ProgressCallback
 # ========================================================================
 
 
-def launch_main_script(script: str = "ToolbarMain.py") -> None:
-    """Run the specified main script using the current Python interpreter."""
-    path = script
-    if not os.path.isabs(path):
-        path = os.path.join(BASE_DIR, path)
-    if not os.path.exists(path):
-        print(f"Main script '{path}' not found")
-        return
-    os.environ[SKIP_ENV_VAR] = "1"
-    os.execv(sys.executable, [sys.executable, path])
 
 
 def main() -> None:
@@ -418,9 +410,31 @@ def main() -> None:
     except Exception as exc:  # pragma: no cover - just in case
         print(f"Update failed: {exc}")
         return
-    launch_main_script()
 
 
 if __name__ == "__main__":
-    main()
+    from PySide2 import QtWidgets
+    import sys
+    import os
+
+    BASE_DIR = os.path.dirname(__file__)
+    sys.path.insert(0, BASE_DIR)
+
+    # Запуск апдейта
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        app = QtWidgets.QApplication(sys.argv)
+
+    result = update_with_ui()
+
+    # После апдейта — запуск ToolbarMain.py
+    try:
+        import ToolbarMain
+        if hasattr(ToolbarMain, 'main'):
+            ToolbarMain.main()
+        # Если нужен запуск конкретной функции — поменяй на свою
+    except Exception as exc:
+        import traceback
+        print("Ошибка запуска ToolbarMain.py:", exc)
+        traceback.print_exc()
 
