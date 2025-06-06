@@ -18,3 +18,8 @@
 2025-06-06 14:42:00,875 [INFO] Local version: 9c06cbb56bccb392091f6caf9e92c7e685219c13
 2025-06-06 14:42:00,875 [INFO] Remote version: None
 2025-06-06 14:42:00,875 [INFO] No remote version
+2025-06-06 14:45:39,678 [INFO] Checking for updates...
+2025-06-06 14:45:40,098 [ERROR] Failed to fetch remote version: 404 Client Error: Not Found for url: https://api.github.com/repos/owner/repo/commits/main
+2025-06-06 14:45:40,098 [INFO] Local version: 9c06cbb56bccb392091f6caf9e92c7e685219c13
+2025-06-06 14:45:40,098 [INFO] Remote version: None
+2025-06-06 14:45:40,098 [INFO] No remote version

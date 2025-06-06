@@ -2,6 +2,14 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>290</width>
+    <height>467</height>
+   </rect>
+  </property>
   <property name="minimumSize">
    <size>
     <width>290</width>
@@ -564,26 +572,13 @@
        <bool>true</bool>
       </property>
      </widget>
-     <widget class="QPushButton" name="btnInfo1">
-      <property name="geometry">
-       <rect>
-        <x>240</x>
-        <y>0</y>
-        <width>21</width>
-        <height>24</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>❓</string>
-      </property>
-     </widget>
      <widget class="QFrame" name="OBJframe">
       <property name="geometry">
        <rect>
         <x>10</x>
         <y>30</y>
         <width>261</width>
-        <height>301</height>
+        <height>411</height>
        </rect>
       </property>
       <property name="styleSheet">
@@ -595,69 +590,6 @@
       <property name="frameShadow">
        <enum>QFrame::Shadow::Raised</enum>
       </property>
-      <widget class="QGroupBox" name="groupBox_4">
-       <property name="geometry">
-        <rect>
-         <x>10</x>
-         <y>170</y>
-         <width>241</width>
-         <height>97</height>
-        </rect>
-       </property>
-       <property name="styleSheet">
-        <string notr="true"/>
-       </property>
-       <property name="title">
-        <string>Основные детали автомобиля</string>
-       </property>
-       <layout class="QGridLayout" name="gridLayout_2">
-        <item row="0" column="1">
-         <widget class="QPushButton" name="btnInterior">
-          <property name="text">
-           <string>Interior</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-          <property name="checked">
-           <bool>false</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="2">
-         <widget class="QPushButton" name="btnWheel">
-          <property name="text">
-           <string>Wheel</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0">
-         <widget class="QPushButton" name="btnBase">
-          <property name="text">
-           <string>Base</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-          <property name="checked">
-           <bool>false</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLineEdit" name="lnedtBase"/>
-        </item>
-        <item row="1" column="1">
-         <widget class="QLineEdit" name="lnedtInterior"/>
-        </item>
-        <item row="1" column="2">
-         <widget class="QLineEdit" name="lnedtWheel"/>
-        </item>
-       </layout>
-      </widget>
       <widget class="QGroupBox" name="groupBox_2">
        <property name="geometry">
         <rect>
@@ -743,86 +675,30 @@
          <x>10</x>
          <y>70</y>
          <width>241</width>
-         <height>91</height>
+         <height>331</height>
         </rect>
        </property>
        <property name="styleSheet">
         <string notr="true"/>
        </property>
        <property name="title">
-        <string>Вариант обвеса:</string>
+        <string>Вариант:</string>
        </property>
-       <layout class="QGridLayout" name="gridLayout">
-        <item row="0" column="3">
-         <widget class="QPushButton" name="btnKit1">
-          <property name="text">
-           <string>Kit1</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="2">
-         <widget class="QLineEdit" name="lnedtKit0"/>
-        </item>
-        <item row="1" column="3">
-         <widget class="QLineEdit" name="lnedtKit1"/>
-        </item>
-        <item row="0" column="2">
-         <widget class="QPushButton" name="btnKit0">
-          <property name="styleSheet">
-           <string notr="true"/>
-          </property>
-          <property name="text">
-           <string>Kit0</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-          <property name="checked">
-           <bool>false</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="4">
-         <widget class="QLineEdit" name="lnedtKit2"/>
-        </item>
-        <item row="0" column="5">
-         <widget class="QPushButton" name="btnKit3">
-          <property name="text">
-           <string>Kit3</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="4">
-         <widget class="QPushButton" name="btnKit2">
-          <property name="text">
-           <string>Kit2</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="5">
-         <widget class="QLineEdit" name="lnedtKit3"/>
-        </item>
-        <item row="0" column="1">
-         <widget class="QPushButton" name="btnKitEmpty">
-          <property name="text">
-           <string>🗑</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-       </layout>
+       <layout class="QGridLayout" name="gridLayout"/>
       </widget>
+     </widget>
+     <widget class="QPushButton" name="btnMakeLayers">
+      <property name="geometry">
+       <rect>
+        <x>170</x>
+        <y>0</y>
+        <width>80</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Сделать Слои</string>
+      </property>
      </widget>
     </widget>
     <widget class="QWidget" name="GeoTab">

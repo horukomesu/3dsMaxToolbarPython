@@ -1,16 +1,27 @@
 import os
 import sys
 import json
+import importlib
 
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, BASE_DIR)
 
-from lodkitfilter import apply_filter_from_button_states, GROUP_TAGS_PATH
+import lodkitfilter
+importlib.reload(lodkitfilter)
+
+from lodkitfilter import (
+    apply_filter_from_button_states,
+    enable_filter,
+    disable_filter,
+    make_layers,
+    GROUP_TAGS_PATH,
+)
 
 from PySide2 import QtWidgets
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtCore import QFile
 import qtmax
+import autoupdater
 
 UI_PATH = os.path.join(BASE_DIR, 'majestic_main.ui')
 
@@ -27,45 +38,29 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         ui_file.close()
         self.setWidget(self.ui)
 
-        self.variant_button_names = []
-        self.setup_variant_buttons()
-        self.setup_buttons_state_logic()
-        self.setup_lod_buttons_group()
+        chk = self.findChild(QtWidgets.QCheckBox, 'chkEnableFilter')
+        if chk:
+            chk.setChecked(False)
+            chk.toggled.connect(self.on_chk_enable_filter)
+            frame = self.findChild(QtWidgets.QFrame, 'OBJframe')
+            if frame:
+                frame.setEnabled(False)
 
-        btn = self.findChild(QtWidgets.QPushButton, "btnL0")
-        if btn:
-            btn.setChecked(True)
-        for name in self.variant_button_names:
-            btn = self.findChild(QtWidgets.QPushButton, name)
-            if btn:
-                btn.setChecked(True)
+        self.setup_lod_buttons()
 
-        self.enable_filter_cb = self.findChild(QtWidgets.QCheckBox, "chkEnableFilter")
-        if self.enable_filter_cb:
-            self.enable_filter_cb.toggled.connect(self.on_enable_filter_toggled)
-            try:
-                self.obj_frame = self.findChild(QtWidgets.QFrame, "OBJframe")
-                if self.obj_frame:
-                    self.obj_frame.setEnabled(self.enable_filter_cb.isChecked())
-                else:
-                    print("[WARN] OBJframe not found in UI")
-            except RuntimeError:
-                print("[WARN] OBJframe access caused RuntimeError")
+        btn_layers = self.findChild(QtWidgets.QPushButton, 'btnMakeLayers')
+        if btn_layers:
+            btn_layers.clicked.connect(self.on_make_layers)
 
-        btn_info = self.findChild(QtWidgets.QPushButton, "btnInfo1")
-        if btn_info:
-            btn_info.clicked.connect(self.show_info_dialog)
-
-    def setup_variant_buttons(self):
-        group = self.findChild(QtWidgets.QGroupBox, "groupBox_3")
-       main
+    def populate_variant_buttons(self):
+        group = self.findChild(QtWidgets.QGroupBox, 'groupBox_3')
         if not group:
             return
         layout = group.layout()
         while layout.count():
             item = layout.takeAt(0)
             if item.widget():
-
+                item.widget().deleteLater()
 
         tags = []
         try:
@@ -78,29 +73,52 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
             btn = QtWidgets.QPushButton(tag)
             btn.setObjectName(f'btnVar_{tag}')
             btn.setCheckable(True)
-            btn.setChecked(True)
+            btn.setChecked(False)
             btn.clicked.connect(self.on_any_button)
-            row = idx // 4
-            col = idx % 4
+            row = idx // 2
+            col = idx % 2
             layout.addWidget(btn, row, col)
 
+    def clear_variant_buttons(self):
+        group = self.findChild(QtWidgets.QGroupBox, 'groupBox_3')
+        if not group:
+            return
+        layout = group.layout()
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
     def setup_lod_buttons(self):
+        self.lod_group = QtWidgets.QButtonGroup(self)
+        self.lod_group.setExclusive(True)
         for i in range(4):
             btn = self.findChild(QtWidgets.QPushButton, f'btnL{i}')
             if btn:
                 btn.setCheckable(True)
-                btn.setChecked(True)
+                self.lod_group.addButton(btn)
+                btn.setChecked(i == 0)
                 btn.clicked.connect(self.on_any_button)
 
     def on_chk_enable_filter(self, checked):
         frame = self.findChild(QtWidgets.QFrame, 'OBJframe')
         if frame:
             frame.setEnabled(checked)
-        self.on_any_button()
+        if checked:
+            enable_filter()
+            self.populate_variant_buttons()
+        else:
+            self.clear_variant_buttons()
+            disable_filter()
+        states = self.collect_states()
+        apply_filter_from_button_states(states)
 
     def on_any_button(self):
         states = self.collect_states()
         apply_filter_from_button_states(states)
+
+    def on_make_layers(self):
+        make_layers()
 
     def collect_states(self):
         states = {}
@@ -115,7 +133,6 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
             if name.startswith('btnVar_'):
                 states[name] = btn.isChecked()
         return states
-
 
     def closeEvent(self, event):
         global ui_dock_widget
@@ -140,4 +157,26 @@ def main():
 
 if __name__ == '__main__':
     ui_dock_widget = None
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+    progress = QtWidgets.QProgressDialog(
+        "Checking for updates...", None, 0, 100, qtmax.GetQMaxMainWindow()
+    )
+    progress.setWindowTitle("Updating")
+    progress.setCancelButton(None)
+    progress.setAutoClose(False)
+    progress.show()
+
+    def on_progress(msg: str, value: int) -> None:
+        progress.setLabelText(msg)
+        progress.setValue(value)
+        app.processEvents()
+
+    updated = autoupdater.check_for_updates(on_progress)
+    progress.close()
+
+    if updated:
+        os.execl(sys.executable, sys.executable, __file__)
+
     main()
