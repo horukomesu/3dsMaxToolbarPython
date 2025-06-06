@@ -416,6 +416,8 @@ if __name__ == "__main__":
     from PySide2 import QtWidgets
     import sys
     import os
+    import importlib
+
 
     BASE_DIR = os.path.dirname(__file__)
     sys.path.insert(0, BASE_DIR)
@@ -430,6 +432,7 @@ if __name__ == "__main__":
     # После апдейта — запуск ToolbarMain.py
     try:
         import ToolbarMain
+        importlib.reload(ToolbarMain)
         if hasattr(ToolbarMain, 'main'):
             ToolbarMain.main()
         # Если нужен запуск конкретной функции — поменяй на свою
