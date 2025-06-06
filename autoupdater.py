@@ -192,7 +192,7 @@ def update_with_ui(parent: Optional[QtWidgets.QWidget] = None) -> bool:
 
     if not needs_update:
         # Даже если обновления нет — проверим ключевые файлы
-        check_key_files_and_recover()
+        check_key_files_and_recover(parent)
         return False
 
 
@@ -253,12 +253,12 @@ def _check_key_files_exist(key_files: list[str]) -> list[str]:
             missing.append(file)
     return missing
 
-def check_key_files_and_recover(callback: Optional[ProgressCallback] = None) -> bool:
+def check_key_files_and_recover(parent=None, callback: Optional[ProgressCallback] = None) -> bool:
     """
     Проверяет наличие ключевых файлов из filelist.txt в репозитории GitHub
     и восстанавливает отсутствующие файлы из архива репозитория.
-
-    Returns True если все ключевые файлы теперь на месте.
+    Возвращает True если все ключевые файлы теперь на месте.
+    Если parent передан, показывает QMessageBox при отсутствии файлов.
     """
     if callback:
         callback("Checking key files...", 0)
@@ -279,6 +279,18 @@ def check_key_files_and_recover(callback: Optional[ProgressCallback] = None) -> 
         return True
 
     _logger.warning("Missing key files: %s", missing)
+    if parent is not None:
+        msg = f"Обнаружены недостающие файлы:\n" + "\n".join(missing) + "\nСкачать из репозитория?"
+        reply = QtWidgets.QMessageBox.question(
+            parent,
+            "Восстановление файлов",
+            msg,
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+        )
+        if reply != QtWidgets.QMessageBox.Yes:
+            _logger.info("User cancelled recovering missing files.")
+            return False
+
     if callback:
         callback("Recovering missing files...", 50)
 
