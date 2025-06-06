@@ -152,8 +152,6 @@ def main():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
     updated = autoupdater.update_with_ui(qtmax.GetQMaxMainWindow())
-    if updated:
-        os.execl(sys.executable, sys.executable, __file__)
 
     if ui_dock_widget:
         try:
