@@ -21,6 +21,12 @@ _LOD_RE = re.compile(r'^(?:lod|l)(\d+)_([^_]+)_', re.I)
 _created_layers = set()
 _track_created = False
 
+# Caches for faster operations
+_layer_cache = {}
+_layer_nodes = {}
+_layer_visible = {}
+_last_button_states = {}
+
 
 @contextmanager
 def scene_redraw_off():
@@ -77,12 +83,26 @@ def parse_name(name):
 
 def get_or_create_layer(name):
     lm = rt.LayerManager
-    lyr = lm.getLayerFromName(name)
+    lyr = _layer_cache.get(name)
+    if not lyr:
+        lyr = lm.getLayerFromName(name)
+        if lyr:
+            _layer_cache[name] = lyr
     if lyr:
         return lyr
     lyr = lm.newLayerFromName(name)
     if _track_created:
         _created_layers.add(name)
+    _layer_cache[name] = lyr
+    return lyr
+
+def get_layer_cached(name):
+    lyr = _layer_cache.get(name)
+    if lyr:
+        return lyr
+    lyr = rt.LayerManager.getLayerFromName(name)
+    if lyr:
+        _layer_cache[name] = lyr
     return lyr
 
 def record_original_layer(obj):
@@ -95,6 +115,7 @@ def record_original_layer(obj):
 @profile_time
 def restore_original_layers():
     lm = rt.LayerManager
+    _layer_nodes.clear()
     layer_cache = {}
     nodes_by_layer = {}
 
@@ -104,7 +125,7 @@ def restore_original_layers():
             continue
         lyr = layer_cache.get(layer_name)
         if lyr is None:
-            lyr = lm.getLayerFromName(layer_name)
+            lyr = get_layer_cached(layer_name)
             layer_cache[layer_name] = lyr
         if lyr:
             nodes_by_layer.setdefault(lyr, []).append(node)
@@ -120,20 +141,38 @@ def restore_original_layers():
 
     _original_layers.clear()
 
+def _collect_layer_handles(layer):
+    """Return cached node handles for the given layer."""
+    handles = _layer_nodes.get(layer.name)
+    if handles is None:
+        try:
+            handles = [n.handle for n in list(layer.nodes) if rt.isValidNode(n)]
+        except Exception:
+            handles = []
+        _layer_nodes[layer.name] = handles
+    return handles
+
+def _bulk_set_hidden(handles, hidden):
+    if not handles:
+        return
+    state = "true" if hidden else "false"
+    handle_list = ",".join(str(h) for h in handles)
+    cmd = (
+        f"for h in #({handle_list}) do ("
+        f"local n = maxOps.getNodeByHandle h; if isValidNode n do n.isHidden = {state})"
+    )
+    try:
+        rt.ExecuteMAXScriptScript(cmd)
+    except Exception:
+        pass
+
 def _sync_layer_objects_visibility(layer):
-    """Ensure objects in the layer match the layer's visibility."""
+    """Sync node hidden state with layer visibility using caching."""
     if not layer:
         return
     visible = bool(getattr(layer, 'on', True))
-    try:
-        for node in list(layer.nodes):
-            if rt.isValidNode(node):
-                try:
-                    node.isHidden = not visible
-                except Exception:
-                    pass
-    except Exception:
-        pass
+    handles = _collect_layer_handles(layer)
+    _bulk_set_hidden(handles, not visible)
 
 @profile_time
 def build_structure(variants, assign_wrong=True):
@@ -171,14 +210,19 @@ def build_structure(variants, assign_wrong=True):
             lyr = lod_layers[layer_name]
             for obj in nodes:
                 lyr.addNode(obj)
+            _layer_nodes[layer_name] = [o.handle for o in nodes]
+            _layer_visible[layer_name] = bool(getattr(lyr, 'on', True))
 
         if assign_wrong and wrong_layer:
             for obj in wrong_nodes:
                 wrong_layer.addNode(obj)
+            _layer_nodes[wrong_layer.name] = [o.handle for o in wrong_nodes]
+            _layer_visible[wrong_layer.name] = bool(getattr(wrong_layer, 'on', True))
 
         for layer in parent_layers.values():
             _sync_layer_objects_visibility(layer)
-        for layer in lod_layers.values():
+            _layer_visible[layer.name] = bool(getattr(layer, 'on', True))
+        for name, layer in lod_layers.items():
             _sync_layer_objects_visibility(layer)
         if wrong_layer:
             _sync_layer_objects_visibility(wrong_layer)
@@ -190,29 +234,44 @@ def build_structure(variants, assign_wrong=True):
 
 @profile_time
 def apply_visibility(button_states, variants):
-    lm = rt.LayerManager
-    layer_cache = {}
-    layer_visibility = {}
+    global _last_button_states
+    if button_states == _last_button_states:
+        return False
+    _last_button_states = dict(button_states)
 
-    # Подготавливаем список слоёв и желаемую видимость
+    layer_visibility = {}
     for variant in variants:
         var_visible = button_states.get(f"btnVar_{variant}", True)
-        var_layer = lm.getLayerFromName(variant)
+        var_layer = get_layer_cached(variant)
         if var_layer:
             layer_visibility[var_layer] = var_visible
-            layer_cache[variant] = var_layer
         for i in range(4):
             name = f"{variant}_LOD{i}"
-            layer = lm.getLayerFromName(name)
+            layer = get_layer_cached(name)
             if layer:
                 layer_visibility[layer] = var_visible and button_states.get(f"btnL{i}", False)
-                layer_cache[name] = layer
 
+    handles_to_hide = []
+    handles_to_show = []
+
+    changed = False
     with scene_redraw_off():
         for layer, state in layer_visibility.items():
+            prev = _layer_visible.get(layer.name)
+            if prev == state:
+                continue
             layer.on = state
-        for layer in layer_visibility:
-            _sync_layer_objects_visibility(layer)
+            _layer_visible[layer.name] = state
+            handles = _collect_layer_handles(layer)
+            if state:
+                handles_to_show.extend(handles)
+            else:
+                handles_to_hide.extend(handles)
+            changed = True
+
+        _bulk_set_hidden(handles_to_hide, True)
+        _bulk_set_hidden(handles_to_show, False)
+    return changed
 
 @profile_time
 def apply_filter_from_button_states(button_states):
@@ -221,8 +280,8 @@ def apply_filter_from_button_states(button_states):
         rt.redrawViews()
         return
 
-    apply_visibility(button_states, _current_variants)
-    rt.redrawViews()
+    if apply_visibility(button_states, _current_variants):
+        rt.redrawViews()
 
 
 @profile_time
@@ -230,6 +289,10 @@ def enable_filter():
     """Parse variants, create layers and record assignments."""
     global _current_variants, _track_created
     _current_variants = save_variants()
+    _layer_cache.clear()
+    _layer_nodes.clear()
+    _layer_visible.clear()
+    _last_button_states.clear()
     with pymxs.undo(True):
         _track_created = True
         build_structure(_current_variants, assign_wrong=True)
@@ -260,6 +323,11 @@ def disable_filter():
                 lyr.on = True
             for lyr in layers_to_show:
                 _sync_layer_objects_visibility(lyr)
+
+        _layer_cache.clear()
+        _layer_nodes.clear()
+        _layer_visible.clear()
+        _last_button_states.clear()
 
         _created_layers.clear()
         _current_variants.clear()
