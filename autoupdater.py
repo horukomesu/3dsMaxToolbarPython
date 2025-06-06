@@ -15,6 +15,8 @@ import zipfile
 from io import BytesIO
 from typing import Callable, Optional
 
+from PySide2 import QtWidgets
+
 import requests
 
 # Configurable parameters ----------------------------------------------------
@@ -43,6 +45,25 @@ if not _logger.handlers:
     _logger.addHandler(stream_handler)
 
 ProgressCallback = Callable[[str, int], None]
+
+
+class UpdateDialog(QtWidgets.QDialog):
+    """Simple dialog displaying update progress."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Updating")
+        layout = QtWidgets.QVBoxLayout(self)
+        self.label = QtWidgets.QLabel("", self)
+        self.progress = QtWidgets.QProgressBar(self)
+        self.progress.setRange(0, 100)
+        layout.addWidget(self.label)
+        layout.addWidget(self.progress)
+
+    def update_status(self, msg: str, value: int) -> None:
+        self.label.setText(msg)
+        self.progress.setValue(value)
+        QtWidgets.QApplication.processEvents()
 
 
 def _read_local_version() -> str:
@@ -76,7 +97,27 @@ def _download_repo_zip() -> bytes:
     return response.content
 
 
-def _restore_missing_files(zip_data: bytes, callback: Optional[ProgressCallback]) -> None:
+def _check_missing_files(zip_data: bytes) -> bool:
+    """Return ``True`` if any repository file is missing locally."""
+    with zipfile.ZipFile(BytesIO(zip_data)) as zf:
+        top = zf.namelist()[0].split("/")[0]
+        for member in zf.namelist():
+            rel = member[len(top) + 1 :]
+            if not rel:
+                continue
+            dst = os.path.join(BASE_DIR, rel)
+            if not os.path.exists(dst):
+                return True
+    return False
+
+
+def _restore_missing_files(
+    zip_data: bytes, callback: Optional[ProgressCallback]
+) -> bool:
+    """Restore files that are missing locally.
+
+    Returns ``True`` when any file has been restored."""
+    restored = False
     with zipfile.ZipFile(BytesIO(zip_data)) as zf:
         top = zf.namelist()[0].split("/")[0]
         members = [m for m in zf.namelist() if m.startswith(top + "/")]
@@ -92,9 +133,11 @@ def _restore_missing_files(zip_data: bytes, callback: Optional[ProgressCallback]
                     os.makedirs(os.path.dirname(dst), exist_ok=True)
                     with zf.open(member) as src, open(dst, "wb") as out:
                         shutil.copyfileobj(src, out)
+                restored = True
                 _logger.info("Restored %s", rel)
                 if callback:
                     callback(f"Restored {rel}", 0)
+    return restored
 
 
 def _perform_update(zip_data: bytes, new_version: str, callback: Optional[ProgressCallback]) -> None:
@@ -175,3 +218,65 @@ def check_for_updates(callback: Optional[ProgressCallback] = None) -> bool:
     if callback:
         callback("Up to date", 100)
     return False
+
+
+def update_with_ui(parent: Optional[QtWidgets.QWidget] = None) -> bool:
+    """Check for updates and missing files and display a progress dialog.
+
+    Returns ``True`` when an update has been installed. Missing files are
+    restored automatically and also trigger the dialog."""
+
+    local_version = _read_local_version()
+    remote_version = _fetch_remote_version()
+
+    try:
+        zip_data = _download_repo_zip()
+    except Exception as exc:
+        _logger.error("Failed to download repository archive: %s", exc)
+        return False
+
+    missing_files = _check_missing_files(zip_data)
+    needs_update = remote_version is not None and local_version != remote_version
+
+    if not missing_files and not needs_update:
+        return False
+
+    if needs_update:
+        reply = QtWidgets.QMessageBox.question(
+            parent,
+            "Update Available",
+            "\u041e\u0431\u043d\u0430\u0440\u0443\u0436\u0435\u043d\u043e \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435, \u0441\u043a\u0430\u0447\u0430\u0442\u044c?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+        )
+        if reply != QtWidgets.QMessageBox.Yes and not missing_files:
+            return False
+        proceed = reply == QtWidgets.QMessageBox.Yes
+    else:
+        proceed = True
+
+    if not proceed and missing_files:
+        # still restore missing files without full update
+        dlg = UpdateDialog(parent)
+        dlg.show()
+
+        def cb(msg: str, value: int) -> None:
+            dlg.update_status(msg, value)
+
+        _restore_missing_files(zip_data, cb)
+        dlg.close()
+        return False
+
+    dlg = UpdateDialog(parent)
+    dlg.show()
+
+    def cb(msg: str, value: int) -> None:
+        dlg.update_status(msg, value)
+
+    if needs_update:
+        cb("Updating...", 0)
+        _perform_update(zip_data, remote_version or "", cb)
+    else:
+        _restore_missing_files(zip_data, cb)
+
+    dlg.close()
+    return needs_update
