@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import pymxs
 from pymxs import runtime as rt
 
 BASE_DIR = os.path.dirname(__file__)
@@ -140,21 +141,17 @@ def enable_filter():
     """Parse variants, create layers and record assignments."""
     global _current_variants, _track_created
     _current_variants = save_variants()
-    rt.undoBegin()
-    try:
+    with pymxs.undo(True):
         _track_created = True
         build_structure(_current_variants, assign_wrong=True)
         _track_created = False
-    finally:
-        rt.undoEnd()
     rt.redrawViews()
 
 
 def disable_filter():
     """Restore nodes to their original layers and remove created layers."""
     global _track_created
-    rt.undoBegin()
-    try:
+    with pymxs.undo(True):
         restore_original_layers()
         lm = rt.LayerManager
         for name in list(_created_layers):
@@ -178,8 +175,6 @@ def disable_filter():
                 pl.on = True
         _current_variants.clear()
         _track_created = False
-    finally:
-        rt.undoEnd()
     rt.redrawViews()
 
 
@@ -187,11 +182,8 @@ def make_layers():
     """Create LOD layers without enabling the filter."""
     global _track_created
     variants = save_variants()
-    rt.undoBegin()
-    try:
+    with pymxs.undo(True):
         _track_created = True
         build_structure(variants, assign_wrong=True)
         _track_created = False
-    finally:
-        rt.undoEnd()
     rt.redrawViews()
