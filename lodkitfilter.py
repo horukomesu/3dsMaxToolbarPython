@@ -76,8 +76,6 @@ def restore_original_layers():
                 lyr.addNode(node)
     _original_layers.clear()
 
-from pymxs import runtime as rt
-
 def build_structure(variants, assign_wrong=True):
     """
     Для каждого варианта создаёт родительский слой (variant).
@@ -142,17 +140,21 @@ def enable_filter():
     """Parse variants, create layers and record assignments."""
     global _current_variants, _track_created
     _current_variants = save_variants()
-    with rt.undo(True, "Enable LOD Filter"):
+    rt.undoBegin()
+    try:
         _track_created = True
         build_structure(_current_variants, assign_wrong=True)
         _track_created = False
+    finally:
+        rt.undoEnd()
     rt.redrawViews()
 
 
 def disable_filter():
     """Restore nodes to their original layers and remove created layers."""
     global _track_created
-    with rt.undo(True, "Disable LOD Filter"):
+    rt.undoBegin()
+    try:
         restore_original_layers()
         lm = rt.LayerManager
         for name in list(_created_layers):
@@ -176,6 +178,8 @@ def disable_filter():
                 pl.on = True
         _current_variants.clear()
         _track_created = False
+    finally:
+        rt.undoEnd()
     rt.redrawViews()
 
 
@@ -183,8 +187,11 @@ def make_layers():
     """Create LOD layers without enabling the filter."""
     global _track_created
     variants = save_variants()
-    with rt.undo(True, "Create LOD Layers"):
+    rt.undoBegin()
+    try:
         _track_created = True
         build_structure(variants, assign_wrong=True)
         _track_created = False
+    finally:
+        rt.undoEnd()
     rt.redrawViews()
