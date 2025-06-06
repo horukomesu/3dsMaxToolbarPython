@@ -1,6 +1,12 @@
 {
     "groups": [
         "base",
-        "stock"
+        "restyle",
+        "restyleunified",
+        "rim",
+        "sport",
+        "sportline",
+        "stock",
+        "yurol"
     ]
 }
