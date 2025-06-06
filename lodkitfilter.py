@@ -69,8 +69,20 @@ def restore_original_layers():
                 lyr.addNode(node)
     _original_layers.clear()
 
+from pymxs import runtime as rt
+
 def build_structure(variants):
-    """Create layer hierarchy variant -> variant_LODX and assign nodes."""
+    """
+    Для каждого варианта создаёт родительский слой (variant).
+    Для каждого variant_LODX создаёт слой и назначает ему parent через setParent().
+    Объекты сцены назначаются в слой variant_LODX.
+    """
+    lm = rt.LayerManager
+    parent_layers = {}
+    # Создаём родительские слои
+    for variant in variants:
+        parent_layers[variant] = get_or_create_layer(variant)
+    # Собираем все объекты и создаём LOD-слои
     for obj in rt.objects:
         if not rt.isValidNode(obj):
             continue
@@ -78,12 +90,19 @@ def build_structure(variants):
         if lod is None or variant not in variants:
             continue
         record_original_layer(obj)
-        var_layer = get_or_create_layer(variant)
-        lod_layer = get_or_create_layer(f"{variant}_LOD{lod}")
-        if hasattr(lod_layer, 'parent'):
-            lod_layer.parent = var_layer
+        var_layer = parent_layers[variant]
+        lod_layer_name = f"{variant}_LOD{lod}"
+        lod_layer = get_or_create_layer(lod_layer_name)
+        # Устанавливаем родителя через setParent
+        if hasattr(lod_layer, 'setParent'):
+            lod_layer.setParent(var_layer)
+        # Назначаем объект в слой
         if hasattr(lod_layer, 'addNode'):
             lod_layer.addNode(obj)
+    # Обновляем отображение
+    rt.redrawViews()
+
+
 
 def apply_visibility(button_states, variants):
     lm = rt.LayerManager

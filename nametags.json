@@ -1,3 +1,7 @@
 {
-    "groups": []
+    "groups": [
+        "base",
+        "body",
+        "stock"
+    ]
 }
