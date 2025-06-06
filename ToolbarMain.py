@@ -66,8 +66,8 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
             btn.setCheckable(True)
             btn.setChecked(False)
             btn.clicked.connect(self.on_any_button)
-            row = idx // 4
-            col = idx % 4
+            row = idx // 2
+            col = idx % 2
             layout.addWidget(btn, row, col)
 
     def clear_variant_buttons(self):

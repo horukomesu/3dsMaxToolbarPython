@@ -132,6 +132,7 @@ def enable_filter():
     global _current_variants
     _current_variants = save_variants()
     build_structure(_current_variants)
+    rt.redrawViews()
 
 
 def disable_filter():
@@ -147,3 +148,4 @@ def disable_filter():
             if l2:
                 l2.on = True
     _current_variants.clear()
+    rt.redrawViews()

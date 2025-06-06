@@ -572,26 +572,13 @@
        <bool>true</bool>
       </property>
      </widget>
-     <widget class="QPushButton" name="btnInfo1">
-      <property name="geometry">
-       <rect>
-        <x>240</x>
-        <y>0</y>
-        <width>21</width>
-        <height>24</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>❓</string>
-      </property>
-     </widget>
      <widget class="QFrame" name="OBJframe">
       <property name="geometry">
        <rect>
         <x>10</x>
         <y>30</y>
         <width>261</width>
-        <height>301</height>
+        <height>411</height>
        </rect>
       </property>
       <property name="styleSheet">
@@ -688,14 +675,14 @@
          <x>10</x>
          <y>70</y>
          <width>241</width>
-         <height>221</height>
+         <height>331</height>
         </rect>
        </property>
        <property name="styleSheet">
         <string notr="true"/>
        </property>
        <property name="title">
-        <string>Вариант обвеса:</string>
+        <string>Вариант:</string>
        </property>
        <layout class="QGridLayout" name="gridLayout"/>
       </widget>

@@ -1,7 +1,6 @@
 {
     "groups": [
         "base",
-        "body",
         "stock"
     ]
 }
