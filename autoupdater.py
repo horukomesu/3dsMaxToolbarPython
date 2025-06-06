@@ -107,6 +107,13 @@ def _download_repo_zip() -> bytes:
     return response.content
 
 
+def _should_ignore(path: str) -> bool:
+    """Return ``True`` for auxiliary files that should be ignored."""
+    return (
+        "__pycache__" in path.split("/") or path.endswith(".pyc")
+    )
+
+
 def _check_missing_files(zip_data: bytes) -> bool:
     """Return ``True`` if any repository file is missing locally."""
     with zipfile.ZipFile(BytesIO(zip_data)) as zf:
@@ -114,6 +121,8 @@ def _check_missing_files(zip_data: bytes) -> bool:
         for member in zf.namelist():
             rel = member[len(top) + 1 :]
             if not rel:
+                continue
+            if _should_ignore(rel):
                 continue
             dst = os.path.join(BASE_DIR, rel)
             if not os.path.exists(dst):
@@ -134,6 +143,8 @@ def _restore_missing_files(
         for member in members:
             rel = member[len(top) + 1 :]
             if not rel:
+                continue
+            if _should_ignore(rel):
                 continue
             dst = os.path.join(BASE_DIR, rel)
             if not os.path.exists(dst):
@@ -239,14 +250,18 @@ def update_with_ui(parent: Optional[QtWidgets.QWidget] = None) -> bool:
 
     if not needs_update and remote_version is not None:
         try:
-            repo_files = get_github_file_list(GITHUB_OWNER, GITHUB_REPO, BRANCH)
-            # Не учитываем служебные
+            repo_files = [
+                f for f in get_github_file_list(GITHUB_OWNER, GITHUB_REPO, BRANCH)
+                if not _should_ignore(f)
+            ]
             ignore = {os.path.basename(__file__), LOG_FILE}
             local_files = set()
             for root, dirs, files in os.walk(BASE_DIR):
+                if "__pycache__" in os.path.relpath(root, BASE_DIR).split(os.sep):
+                    continue
                 for file in files:
                     rel = os.path.relpath(os.path.join(root, file), BASE_DIR)
-                    if file not in ignore:
+                    if file not in ignore and not _should_ignore(rel.replace("\\", "/")):
                         local_files.add(rel.replace("\\", "/"))
             for file in repo_files:
                 if file not in local_files:
