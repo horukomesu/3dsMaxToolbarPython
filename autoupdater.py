@@ -14,7 +14,7 @@ import zipfile
 from io import BytesIO
 from typing import Callable, Optional
 
-from PySide2 import QtWidgets
+from PySide2 import QtWidgets, QtCore
 
 import requests
 
@@ -61,6 +61,50 @@ class UpdateDialog(QtWidgets.QDialog):
         QtWidgets.QApplication.processEvents()
 
 
+class UpdateThread(QtCore.QThread):
+    """Background worker executing :func:`update_logic`."""
+
+    progress = QtCore.Signal(str, int)
+    finished_with_result = QtCore.Signal(bool)
+    request_confirm = QtCore.Signal(str)
+    error = QtCore.Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._mutex = QtCore.QMutex()
+        self._wait = QtCore.QWaitCondition()
+        self._confirm_answer: Optional[bool] = None
+        self.result = False
+
+    @QtCore.Slot(bool)
+    def confirm_reply(self, answer: bool) -> None:
+        self._mutex.lock()
+        self._confirm_answer = answer
+        self._wait.wakeAll()
+        self._mutex.unlock()
+
+    def _confirm(self, message: str) -> bool:
+        self._mutex.lock()
+        self._confirm_answer = None
+        self.request_confirm.emit(message)
+        while self._confirm_answer is None:
+            self._wait.wait(self._mutex)
+        ans = self._confirm_answer
+        self._mutex.unlock()
+        return bool(ans)
+
+    def _progress(self, msg: str, value: int) -> None:
+        self.progress.emit(msg, value)
+
+    def run(self) -> None:
+        try:
+            self.result = update_logic(self._confirm, self._progress)
+        except Exception as exc:  # pragma: no cover - just in case
+            self.error.emit(str(exc))
+            self.result = False
+        self.finished_with_result.emit(self.result)
+
+
 def _read_local_version() -> str:
     path = os.path.join(BASE_DIR, VERSION_FILE)
     try:
@@ -70,7 +114,7 @@ def _read_local_version() -> str:
         return ""
 
 
-def _fetch_remote_version() -> Optional[str]:
+def fetch_remote_version() -> Optional[str]:
     url = (
         f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/"
         f"{BRANCH}/{VERSION_FILE}"
@@ -84,7 +128,7 @@ def _fetch_remote_version() -> Optional[str]:
         return None
 
 
-def _download_repo_zip() -> bytes:
+def download_repo_zip() -> bytes:
     url = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/archive/refs/heads/{BRANCH}.zip"
     _logger.info("Downloading repository archive...")
     response = requests.get(url, timeout=60)
@@ -136,101 +180,106 @@ def _perform_update(zip_data: bytes, new_version: str, callback: Optional[Progre
     _logger.info("Update installed")
 
 
-def check_for_updates(callback: Optional[ProgressCallback] = None) -> bool:
-    """Check GitHub for a newer version and update if necessary.
-
-    Returns ``True`` when an update has been installed.
-    """
+def update_logic(confirm: Callable[[str], bool],
+                 callback: Optional[ProgressCallback] = None) -> bool:
+    """Core workflow used by both UI and CLI wrappers."""
     if callback:
         callback("Checking for updates...", 0)
     _logger.info("Checking for updates...")
 
     local_version = _read_local_version()
-    remote_version = _fetch_remote_version()
+    remote_version = fetch_remote_version()
 
     _logger.info("Local version: %s", local_version)
     _logger.info("Remote version: %s", remote_version)
 
-    try:
-        zip_data = _download_repo_zip()
-    except Exception as exc:
-        _logger.error("Failed to download repository archive: %s", exc)
-        if callback:
-            callback("Download failed", 100)
-        # Проверяем ключевые файлы даже если архив не скачался!
-        check_key_files_and_recover(callback)
-        return False
-
     if remote_version is None:
         if callback:
             callback("Failed to fetch remote version", 100)
-        check_key_files_and_recover(callback)
+        restore_key_files(confirm, callback)
         return False
 
-    if local_version != remote_version:
+    needs_update = local_version != remote_version
+    zip_data = b""
+    if needs_update:
+        if not confirm("Обнаружено обновление, скачать?"):
+            needs_update = False
+        else:
+            try:
+                zip_data = download_repo_zip()
+            except Exception as exc:
+                _logger.error("Failed to download repository archive: %s", exc)
+                if callback:
+                    callback("Download failed", 100)
+                restore_key_files(confirm, callback)
+                return False
+
+    if needs_update:
         if callback:
             callback("Updating...", 50)
         _perform_update(zip_data, remote_version, callback)
         if callback:
             callback("Done", 100)
-        # После обновления — сразу проверяем ключевые файлы
-        check_key_files_and_recover(callback)
-        return True
 
-    if callback:
+    # всегда проверяем ключевые файлы
+    restore_key_files(confirm, callback)
+
+    if not needs_update and callback:
         callback("Up to date", 100)
-    # Даже если всё up-to-date — всё равно проверяем ключевые файлы
-    check_key_files_and_recover(callback)
-    return False
+
+    return needs_update
+
+
+def check_for_updates(callback: Optional[ProgressCallback] = None) -> bool:
+    """Check GitHub for a newer version and update if necessary."""
+
+    return update_logic(lambda _msg: True, callback)
 
 
 def update_with_ui(parent: Optional[QtWidgets.QWidget] = None) -> bool:
-    local_version = _read_local_version()
-    remote_version = _fetch_remote_version()
-
-    needs_update = remote_version is not None and local_version != remote_version
-
-    if not needs_update:
-        # Даже если обновления нет — проверим ключевые файлы
-        check_key_files_and_recover(parent)
-        return False
-
-
-    # Запрашиваем подтверждение!
-    question = "Обнаружено обновление, скачать?"
-
-    reply = QtWidgets.QMessageBox.question(
-        parent,
-        "Обновление",
-        question,
-        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-    )
-    if reply != QtWidgets.QMessageBox.Yes:
-        return False
-
-    # Только теперь скачиваем архив!
-    try:
-        zip_data = _download_repo_zip()
-    except Exception as exc:
-        _logger.error("Failed to download repository archive: %s", exc)
-        return False
+    """Run update workflow in a background thread displaying simple UI."""
 
     dlg = UpdateDialog(parent)
-    dlg.show()
+    thread = UpdateThread(dlg)
 
-    def cb(msg: str, value: int) -> None:
+    def on_progress(msg: str, value: int) -> None:
         dlg.update_status(msg, value)
 
-    cb("Updating...", 0)
-    _perform_update(zip_data, remote_version or "", cb)
+    def on_confirm(msg: str) -> None:
+        reply = QtWidgets.QMessageBox.question(
+            parent,
+            "Обновление",
+            msg,
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+        )
+        thread.confirm_reply(reply == QtWidgets.QMessageBox.Yes)
+
+    result: bool = False
+
+    def on_finished(res: bool) -> None:
+        nonlocal result
+        result = res
+        loop.quit()
+
+    thread.progress.connect(on_progress)
+    thread.request_confirm.connect(on_confirm)
+    thread.finished_with_result.connect(on_finished)
+
+    dlg.show()
+    thread.start()
+
+    loop = QtCore.QEventLoop()
+    loop.exec_()
+
+    thread.wait()
     dlg.close()
-    return needs_update
+    return result
 
 # ========================================================================
 # KEY FILE CHECK LOGIC
 # ========================================================================
 
-def _fetch_filelist() -> Optional[list[str]]:
+def fetch_filelist() -> Optional[list[str]]:
     """Скачать и вернуть список ключевых файлов из filelist.txt на GitHub."""
     url = (
         f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/"
@@ -253,18 +302,37 @@ def _check_key_files_exist(key_files: list[str]) -> list[str]:
             missing.append(file)
     return missing
 
-def check_key_files_and_recover(parent=None, callback: Optional[ProgressCallback] = None) -> bool:
-    """
-    Проверяет наличие ключевых файлов из filelist.txt в репозитории GitHub
-    и восстанавливает отсутствующие файлы из архива репозитория.
-    Возвращает True если все ключевые файлы теперь на месте.
-    Если parent передан, показывает QMessageBox при отсутствии файлов.
-    """
+
+def recover_files_from_zip(zip_data: bytes, missing: list[str],
+                           callback: Optional[ProgressCallback]) -> list[str]:
+    """Extract only ``missing`` files from ``zip_data`` archive."""
+    with zipfile.ZipFile(BytesIO(zip_data)) as zf:
+        top = zf.namelist()[0].split("/")[0]
+        recovered = []
+        for file in missing:
+            repo_file = f"{top}/{file.replace(os.sep, '/')}"
+            if repo_file in zf.namelist():
+                dst = os.path.join(BASE_DIR, file)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                with zf.open(repo_file) as src, open(dst, "wb") as out:
+                    shutil.copyfileobj(src, out)
+                recovered.append(file)
+                _logger.info("Recovered missing file: %s", file)
+                if callback:
+                    callback(f"Recovered {file}", 0)
+            else:
+                _logger.error("File %s not found in repo archive!", file)
+    return recovered
+
+
+def restore_key_files(confirm: Callable[[str], bool],
+                      callback: Optional[ProgressCallback] = None) -> bool:
+    """Ensure key files listed in ``filelist.txt`` exist, recovering if needed."""
     if callback:
         callback("Checking key files...", 0)
     _logger.info("Checking key files...")
 
-    key_files = _fetch_filelist()
+    key_files = fetch_filelist()
     if key_files is None:
         if callback:
             callback("Failed to fetch filelist", 100)
@@ -279,48 +347,43 @@ def check_key_files_and_recover(parent=None, callback: Optional[ProgressCallback
         return True
 
     _logger.warning("Missing key files: %s", missing)
-    if parent is not None:
-        msg = f"Обнаружены недостающие файлы:\n" + "\n".join(missing) + "\nСкачать из репозитория?"
-        reply = QtWidgets.QMessageBox.question(
-            parent,
-            "Восстановление файлов",
-            msg,
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-        )
-        if reply != QtWidgets.QMessageBox.Yes:
-            _logger.info("User cancelled recovering missing files.")
-            return False
+    if not confirm(
+        "\n".join(["Обнаружены недостающие файлы:", *missing, "Скачать из репозитория?"])
+    ):
+        _logger.info("User cancelled recovering missing files.")
+        return False
 
     if callback:
         callback("Recovering missing files...", 50)
 
-    # Скачиваем zip и восстанавливаем только недостающие
     try:
-        zip_data = _download_repo_zip()
+        zip_data = download_repo_zip()
     except Exception as exc:
         _logger.error("Failed to download repository archive: %s", exc)
         if callback:
             callback("Download failed", 100)
         return False
 
-    with zipfile.ZipFile(BytesIO(zip_data)) as zf:
-        top = zf.namelist()[0].split("/")[0]
-        recovered = []
-        for file in missing:
-            repo_file = f"{top}/{file.replace(os.sep, '/')}"
-            if repo_file in zf.namelist():
-                dst = os.path.join(BASE_DIR, file)
-                os.makedirs(os.path.dirname(dst), exist_ok=True)
-                with zf.open(repo_file) as src, open(dst, "wb") as out:
-                    shutil.copyfileobj(src, out)
-                recovered.append(file)
-                _logger.info("Recovered missing file: %s", file)
-            else:
-                _logger.error("File %s not found in repo archive!", file)
-        if callback:
-            callback("Recovered missing files", 100)
-        _logger.info("Recovered files: %s", recovered)
-    return not _check_key_files_exist(key_files)  # Проверим что теперь все есть
+    recovered = recover_files_from_zip(zip_data, missing, callback)
+    if callback:
+        callback("Recovered missing files", 100)
+    _logger.info("Recovered files: %s", recovered)
+    return not _check_key_files_exist(key_files)
+
+def check_key_files_and_recover(parent=None, callback: Optional[ProgressCallback] = None) -> bool:
+    """UI wrapper for :func:`restore_key_files`."""
+    def confirm(message: str) -> bool:
+        if parent is None:
+            return True
+        reply = QtWidgets.QMessageBox.question(
+            parent,
+            "Восстановление файлов",
+            message,
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+        )
+        return reply == QtWidgets.QMessageBox.Yes
+
+    return restore_key_files(confirm, callback)
 
 # ========================================================================
 
