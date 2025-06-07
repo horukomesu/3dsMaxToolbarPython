@@ -18,7 +18,10 @@ from io import BytesIO
 from typing import Callable, Optional
 import sys
 
-from PySide2 import QtWidgets, QtCore
+try:
+    from PySide6 import QtWidgets, QtCore
+except ImportError:
+    from PySide2 import QtWidgets, QtCore
 
 import requests
 
@@ -397,7 +400,6 @@ def check_key_files_and_recover(parent=None, callback: Optional[ProgressCallback
 
     return restore_key_files(confirm, callback)
 
-# ========================================================================
 
 
 
@@ -413,7 +415,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    from PySide2 import QtWidgets
+    try:
+        from PySide6 import QtWidgets, QtCore
+    except ImportError:
+        from PySide2 import QtWidgets, QtCore   
     import sys
     import os
     import importlib
@@ -429,13 +434,11 @@ if __name__ == "__main__":
 
     result = update_with_ui()
 
-    # После апдейта — запуск ToolbarMain.py
     try:
         import ToolbarMain
         importlib.reload(ToolbarMain)
         if hasattr(ToolbarMain, 'main'):
             ToolbarMain.main()
-        # Если нужен запуск конкретной функции — поменяй на свою
     except Exception as exc:
         import traceback
         print("Ошибка запуска ToolbarMain.py:", exc)

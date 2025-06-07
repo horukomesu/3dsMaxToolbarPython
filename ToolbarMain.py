@@ -17,9 +17,15 @@ from lodkitfilter import (
     GROUP_TAGS_PATH,
 )
 
-from PySide2 import QtWidgets
-from PySide2.QtUiTools import QUiLoader
-from PySide2.QtCore import QFile
+try:
+    from PySide6 import QtWidgets, QtCore
+    from PySide6.QtUiTools import QUiLoader
+    from PySide6.QtCore import QFile
+except ImportError:
+    from PySide2 import QtWidgets, QtCore
+    from PySide2.QtUiTools import QUiLoader
+    from PySide2.QtCore import QFile
+    
 import qtmax
 
 
