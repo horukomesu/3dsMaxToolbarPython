@@ -535,7 +535,7 @@
      <enum>QTabWidget::TabShape::Rounded</enum>
     </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>4</number>
     </property>
     <property name="elideMode">
      <enum>Qt::TextElideMode::ElideNone</enum>
@@ -763,6 +763,19 @@
        </item>
       </layout>
      </widget>
+     <widget class="QLabel" name="label_3">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>110</y>
+        <width>151</width>
+        <height>101</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>В РАЗРАБОТКЕ</string>
+      </property>
+     </widget>
     </widget>
     <widget class="QWidget" name="FastCheckTab">
      <attribute name="title">
@@ -846,16 +859,55 @@
        </item>
       </layout>
      </widget>
+     <widget class="QLabel" name="label_4">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>120</y>
+        <width>151</width>
+        <height>101</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>В РАЗРАБОТКЕ</string>
+      </property>
+     </widget>
     </widget>
     <widget class="QWidget" name="MatTab">
      <attribute name="title">
       <string>🎨 Materials</string>
      </attribute>
+     <widget class="QLabel" name="label_5">
+      <property name="geometry">
+       <rect>
+        <x>50</x>
+        <y>70</y>
+        <width>151</width>
+        <height>101</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>В РАЗРАБОТКЕ</string>
+      </property>
+     </widget>
     </widget>
     <widget class="QWidget" name="utilsTab">
      <attribute name="title">
       <string>🛠 Utilities</string>
      </attribute>
+     <widget class="QLabel" name="label_6">
+      <property name="geometry">
+       <rect>
+        <x>60</x>
+        <y>70</y>
+        <width>151</width>
+        <height>101</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>В РАЗРАБОТКЕ</string>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>
