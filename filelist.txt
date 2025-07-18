@@ -3,5 +3,4 @@ majestic_main.ui
 ToolbarMain.py
 nametags.json
 VERSION
-seam_checker.py
 
