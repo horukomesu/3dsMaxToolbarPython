@@ -17,6 +17,9 @@ from lodkitfilter import (
     GROUP_TAGS_PATH,
 )
 
+# Импорт модуля проверки швов
+import seam_checker
+
 try:
     from PySide6 import QtWidgets, QtCore
     from PySide6.QtUiTools import QUiLoader
@@ -57,6 +60,11 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
         btn_layers = self.findChild(QtWidgets.QPushButton, 'btnMakeLayers')
         if btn_layers:
             btn_layers.clicked.connect(self.on_make_layers)
+
+        # Подключение кнопки проверки швов
+        btn_352_check = self.findChild(QtWidgets.QPushButton, 'btn352check')
+        if btn_352_check:
+            btn_352_check.clicked.connect(self.on_352_check)
 
     def populate_variant_buttons(self):
         group = self.findChild(QtWidgets.QGroupBox, 'groupBox_3')
@@ -125,6 +133,72 @@ class MajesticDockWidget(QtWidgets.QDockWidget):
 
     def on_make_layers(self):
         make_layers()
+
+    def on_352_check(self):
+        """Обработчик нажатия кнопки 3.5.2 Check."""
+        try:
+            # Запускаем анализ швов
+            result = seam_checker.run_seam_analysis(visible_only=True)
+            
+            if result.get('success'):
+                # Показываем результаты
+                summary = seam_checker.get_analysis_summary()
+                unmatched_objects = seam_checker.get_unmatched_objects_list()
+                
+                # Создаем диалог с результатами
+                dialog = QtWidgets.QDialog(self)
+                dialog.setWindowTitle("3.5.2 Check - Результаты анализа")
+                dialog.setModal(True)
+                dialog.resize(400, 300)
+                
+                layout = QtWidgets.QVBoxLayout(dialog)
+                
+                # Информация о результатах
+                info_label = QtWidgets.QLabel(summary)
+                info_label.setWordWrap(True)
+                layout.addWidget(info_label)
+                
+                # Список объектов с проблемами
+                if unmatched_objects:
+                    objects_label = QtWidgets.QLabel("Объекты с несовпадающими вершинами:")
+                    layout.addWidget(objects_label)
+                    
+                    objects_list = QtWidgets.QListWidget()
+                    objects_list.addItems(unmatched_objects)
+                    layout.addWidget(objects_list)
+                
+                # Кнопки действий
+                button_layout = QtWidgets.QHBoxLayout()
+                
+                select_btn = QtWidgets.QPushButton("Выделить вершины")
+                select_btn.clicked.connect(lambda: self.select_problem_vertices(dialog))
+                button_layout.addWidget(select_btn)
+                
+                close_btn = QtWidgets.QPushButton("Закрыть")
+                close_btn.clicked.connect(dialog.accept)
+                button_layout.addWidget(close_btn)
+                
+                layout.addLayout(button_layout)
+                
+                dialog.exec()
+            else:
+                # Показываем ошибку
+                error_msg = result.get('error', 'Неизвестная ошибка')
+                QtWidgets.QMessageBox.warning(self, "Ошибка анализа", error_msg)
+                
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Ошибка", f"Ошибка при выполнении анализа: {str(e)}")
+
+    def select_problem_vertices(self, dialog):
+        """Выделяет проблемные вершины в сцене."""
+        try:
+            success = seam_checker.select_problem_vertices()
+            if success:
+                QtWidgets.QMessageBox.information(dialog, "Успех", "Проблемные вершины выделены в сцене")
+            else:
+                QtWidgets.QMessageBox.warning(dialog, "Предупреждение", "Не удалось выделить вершины")
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(dialog, "Ошибка", f"Ошибка при выделении вершин: {str(e)}")
 
     def collect_states(self):
         states = {}
