@@ -1,13 +1,24 @@
 import os
 import json
-import pymxs
 from math import floor
 from contextlib import contextmanager
 from typing import List, Tuple, Dict, Any
 
+# Импорт pymxs с обработкой ошибок
+try:
+    import pymxs
+    rt = pymxs.runtime
+except ImportError:
+    print("Ошибка: pymxs не найден. Модуль работает только в 3ds Max.")
+    rt = None
+
 # Импорт из основного модуля
-import lodkitfilter
-from lodkitfilter import scene_redraw_off
+try:
+    import lodkitfilter
+    from lodkitfilter import scene_redraw_off
+except ImportError:
+    print("Ошибка: lodkitfilter не найден.")
+    scene_redraw_off = contextmanager(lambda: (yield))
 
 # Константы
 THRESHOLD = 0.001
@@ -71,8 +82,12 @@ def find_unmatched_vertices(vertices_data: List[Dict[str, Any]]) -> List[Dict[st
 
 def get_boundary_vertices(obj) -> List[int]:
     """Получает индексы вершин на открытых ребрах объекта."""
+    global rt
+    if rt is None:
+        print("Ошибка: pymxs не доступен")
+        return []
+    
     try:
-        rt = pymxs.runtime
         open_edges = rt.polyOp.getOpenEdges(obj)
         if open_edges.isEmpty:
             return []
@@ -92,6 +107,11 @@ def export_vertices_to_json(selected_objects, visible_only=True) -> List[Dict[st
     Returns:
         Список вершин в JSON формате
     """
+    global rt
+    if rt is None:
+        print("Ошибка: pymxs не доступен")
+        return []
+    
     vertices_data = []
     
     for obj in selected_objects:
@@ -133,9 +153,16 @@ def analyze_seams(selected_objects=None, visible_only=True) -> Dict[str, Any]:
     Returns:
         Словарь с результатами анализа
     """
-    global _unmatched_vertices, _analysis_results
+    global _unmatched_vertices, _analysis_results, rt
     
-    rt = pymxs.runtime
+    if rt is None:
+        return {
+            "success": False,
+            "error": "pymxs не доступен. Модуль работает только в 3ds Max.",
+            "total_vertices": 0,
+            "unmatched_count": 0,
+            "objects_analyzed": 0
+        }
     
     # Получаем объекты для анализа
     if selected_objects is None:
@@ -190,13 +217,15 @@ def analyze_seams(selected_objects=None, visible_only=True) -> Dict[str, Any]:
 
 def select_unmatched_vertices():
     """Выделяет несовпадающие вершины в 3ds Max."""
-    global _unmatched_vertices
+    global _unmatched_vertices, rt
+    
+    if rt is None:
+        print("Ошибка: pymxs не доступен")
+        return False
     
     if not _unmatched_vertices:
         print("Нет данных о несовпадающих вершинах. Сначала выполните анализ.")
         return False
-    
-    rt = pymxs.runtime
     
     with scene_redraw_off():
         try:
